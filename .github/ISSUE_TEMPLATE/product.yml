@@ -1,0 +1,39 @@
+name: Qualcomm CLI product issue
+description: Report installation, deployment-guide, skill, MCP, or release-mirror problems.
+title: "[Product]: "
+labels: ["product"]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: melange-qcom version
+      placeholder: v0.6.0
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Installation or update
+        - Android or Flutter deployment guide
+        - Agent skill
+        - MCP server
+        - Release mirror
+        - Other Qualcomm workflow
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction and expected result
+      description: Include commands, platform, expected behavior, actual behavior, and redacted diagnostics.
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Sensitive data
+      options:
+        - label: I removed API keys, tokens, private model data, and account identifiers.
+          required: true

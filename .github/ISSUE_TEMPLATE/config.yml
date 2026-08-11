@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Melange CLI source changes
+    url: https://github.com/zetic-ai/melange-cli/issues/new
+    about: Report general CLI bugs or propose source changes in the upstream repository.
+  - name: Private security report
+    url: https://github.com/zetic-ai/melange-cli/security/policy
+    about: Do not report vulnerabilities in a public issue.

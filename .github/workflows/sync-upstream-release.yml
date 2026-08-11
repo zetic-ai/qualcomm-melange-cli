@@ -1,0 +1,40 @@
+name: Sync upstream releases
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Optional exact upstream tag (for example v0.6.0)"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-upstream-release
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.1.2
+
+      - name: Test mirror tooling
+        run: ./test/run.sh
+
+      - name: Mirror published upstream releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_TAG: ${{ inputs.tag }}
+        run: ./script/sync-release.sh "$REQUESTED_TAG"

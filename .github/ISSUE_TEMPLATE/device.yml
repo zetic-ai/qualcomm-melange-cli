@@ -1,0 +1,33 @@
+name: Qualcomm device or benchmark issue
+description: Report missing devices, incorrect filtering, or benchmark presentation problems.
+title: "[Device]: "
+labels: ["device"]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: melange-qcom version
+      placeholder: v0.6.0
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device and SoC
+      placeholder: Galaxy S25 / SM8750
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Include the command, expected result, actual result, and redacted structured output when possible.
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Sensitive data
+      options:
+        - label: I removed API keys, tokens, private model data, and account identifiers.
+          required: true
