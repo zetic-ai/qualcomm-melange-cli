@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "upstream_repository": "https://github.com/zetic-ai/melange-cli",
-  "tag": "v0.7.0",
-  "commit": "a750db7331028d511f72cabf4e0f38f2b6185d91",
-  "release_url": "https://github.com/zetic-ai/melange-cli/releases/tag/v0.7.0"
+  "tag": "v0.7.1",
+  "commit": "4752f9f6b244f92b6efbee17df1e7f2e20bd6bf7",
+  "release_url": "https://github.com/zetic-ai/melange-cli/releases/tag/v0.7.1"
 }
