@@ -17,7 +17,7 @@ the matching `melange-qcom` binary and agent skill. Pass installer options after
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/zetic-ai/qualcomm-melange-cli/main/install.sh | \
-  sh -s -- --version v0.6.0 --require-signature
+  sh -s -- --require-signature
 ```
 
 ## What is mirrored here
