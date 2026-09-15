@@ -44,19 +44,44 @@ agent based on the pinned OpenCode source recorded in
 [`desktop/OPENCODE_UPSTREAM.json`](desktop/OPENCODE_UPSTREAM.json). The OpenCode
 MIT license and attribution remain in the vendored tree.
 
-Build the unsigned DMG and ZIP on an Apple Silicon Mac:
+There is no Melange Agent GitHub Release yet. Coworkers can build and install
+the current production app directly from this repository on an Apple Silicon
+Mac. Run `xcode-select --install` first and finish the macOS prompt, then run:
 
 ```sh
+brew install bun cosign
+git clone https://github.com/zetic-ai/qualcomm-melange-cli.git
+cd qualcomm-melange-cli
 cd desktop
 bun install --frozen-lockfile
-bun run --cwd packages/desktop build
-bun run --cwd packages/desktop package:mac
+cd packages/desktop
+OPENCODE_CHANNEL=prod bun run build
+OPENCODE_CHANNEL=prod bun run package:mac
+open dist/melange-agent-mac-arm64.dmg
 ```
+
+Drag **Melange Agent** to **Applications**. Sign-in is optional and can be
+skipped on first launch. The build is currently unsigned and supports macOS
+on Apple Silicon only.
 
 The build requires network access and `cosign`. It downloads Qualcomm
 `melange-qcom` v0.10.0 from this repository's release mirror, verifies the
 signed checksum manifest and archive hash, and packages the CLI and skill in
 the app. It does not run the global installer or modify user executable paths.
+
+Verify each locally built artifact after packaging:
+
+```sh
+shasum -a 256 \
+  dist/melange-agent-mac-arm64.dmg \
+  dist/melange-agent-mac-arm64.zip
+```
+
+The SHA-256 value is generated after the build because each local archive can
+have a different checksum. A fixed checksum should be published with the DMG
+and ZIP when a GitHub Release is created. See
+[`desktop/README.md`](desktop/README.md) for complete build, installation, and
+verification instructions.
 
 ## Support and development
 
