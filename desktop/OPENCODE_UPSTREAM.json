@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "repository": "https://github.com/anomalyco/opencode",
+  "branch": "dev",
+  "commit": "e03db9bc6908f75c9334d8aa997deeaac81c0298",
+  "license": "MIT",
+  "license_file": "LICENSE"
+}

@@ -22,9 +22,9 @@ curl -fsSL https://raw.githubusercontent.com/zetic-ai/qualcomm-melange-cli/main/
 
 ## What is mirrored here
 
-This is a product, release, and issue-intake repository—not a source fork.
+The CLI release mirror in this repository is not a source fork.
 [`zetic-ai/melange-cli`](https://github.com/zetic-ai/melange-cli) remains the
-only source, build, signing, version, npm, and Homebrew authority.
+only CLI source, build, signing, version, npm, and Homebrew authority.
 
 Each release copies, without rebuilding:
 
@@ -36,6 +36,27 @@ Each release copies, without rebuilding:
 
 The mirror verifies the upstream release-workflow certificate identity and all
 QCOM asset hashes before publishing a draft.
+
+## Melange Agent desktop
+
+[`desktop/`](desktop/) contains Melange Agent, an Apple Silicon desktop coding
+agent based on the pinned OpenCode source recorded in
+[`desktop/OPENCODE_UPSTREAM.json`](desktop/OPENCODE_UPSTREAM.json). The OpenCode
+MIT license and attribution remain in the vendored tree.
+
+Build the unsigned DMG and ZIP on an Apple Silicon Mac:
+
+```sh
+cd desktop
+bun install --frozen-lockfile
+bun run --cwd packages/desktop build
+bun run --cwd packages/desktop package:mac
+```
+
+The build requires network access and `cosign`. It downloads Qualcomm
+`melange-qcom` v0.10.0 from this repository's release mirror, verifies the
+signed checksum manifest and archive hash, and packages the CLI and skill in
+the app. It does not run the global installer or modify user executable paths.
 
 ## Support and development
 
