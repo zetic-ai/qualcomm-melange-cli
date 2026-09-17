@@ -21,6 +21,7 @@ import { Button } from "@opencode-ai/ui/button"
 import { Card } from "@opencode-ai/ui/card"
 import {
   ContextToolGroup,
+  ShellToolGroup,
   Message,
   MessageDivider,
   Part as MessagePart,
@@ -436,8 +437,12 @@ export function MessageTimeline(props: {
         return TimelineRow.key(row)
       }
     },
-    anchorTo: "end",
-    followOnAppend: true,
+    get anchorTo() {
+      return props.shouldAnchorBottom() ? "end" : "start"
+    },
+    get followOnAppend() {
+      return props.shouldAnchorBottom()
+    },
     scrollEndThreshold: 80,
     get scrollMargin() {
       return showHeader() ? 64 : 0
@@ -973,6 +978,21 @@ export function MessageTimeline(props: {
   }
 
   const renderAssistantPartGroup = (row: Accessor<TimelineRowMap["AssistantPart"]>, onSizeChange?: () => void) => {
+    if (row().group.type === "shell") {
+      return (
+        <ShellToolGroup
+          refs={(() => {
+            const group = row().group
+            return group.type === "shell" ? group.refs : []
+          })()}
+          getPart={(ref) => getMsgPart(ref.messageID, ref.partID)}
+          getMessage={(ref) => messageByID().get(ref.messageID) as AssistantMessage | undefined}
+          busy={
+            workingTurn(row().userMessageID) && lastAssistantGroupKey().get(row().userMessageID) === row().group.key
+          }
+        />
+      )
+    }
     if (row().group.type === "context") {
       const parts = createMemo(() => {
         const group = row().group

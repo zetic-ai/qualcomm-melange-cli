@@ -12,6 +12,7 @@ import {
   type Accessor,
 } from "solid-js"
 import { makeEventListener } from "@solid-primitives/event-listener"
+import { BrandHeader } from "@/components/brand-header"
 import { useNavigate, useParams } from "@solidjs/router"
 import { useLayout, LocalProject } from "@/context/layout"
 import { useServerSync } from "@/context/server-sync"
@@ -2221,6 +2222,7 @@ export default function LegacyLayout(props: ParentProps) {
             : undefined
         }
       />
+      <BrandHeader />
       <Show when={updateVersion() !== undefined}>
         <UpdateAvailableToast version={updateVersion() ?? ""} install={installUpdate} language={language} />
       </Show>

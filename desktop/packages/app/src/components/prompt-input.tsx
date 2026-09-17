@@ -73,6 +73,7 @@ import {
   type PromptInputSubmission,
 } from "./prompt-input/contracts"
 import { createPromptSubmit } from "./prompt-input/submit"
+import { DemoPrompts } from "./demo-prompts"
 import { PromptPopover, type AtOption, type SlashCommand } from "./prompt-input/slash-popover"
 import { PromptContextItems } from "./prompt-input/context-items"
 import { PromptImageAttachments } from "./prompt-input/image-attachments"
@@ -1435,6 +1436,19 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   return (
     <div class="relative size-full flex flex-col gap-0">
       {(promptReady(), null)}
+      <DemoPrompts
+        hidden={hasUserPrompt()}
+        disabled={
+          !prompt.ready() ||
+          working() ||
+          prompt.current().some((part) => part.type !== "text" || part.content.trim().length > 0)
+        }
+        onSend={(text) => {
+          setStore("mode", "normal")
+          prompt.set([{ type: "text", content: text, start: 0, end: text.length }], text.length)
+          void handleSubmit(new Event("submit"))
+        }}
+      />
       <PromptPopover
         popover={store.popover}
         setSlashPopoverRef={(el) => (slashPopoverRef = el)}

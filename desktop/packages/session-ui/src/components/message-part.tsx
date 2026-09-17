@@ -62,7 +62,6 @@ import { AnimatedCountList } from "./tool-count-summary"
 import { ToolStatusTitle } from "./tool-status-title"
 import { patchFiles } from "./apply-patch-file"
 import { partDefaultOpen } from "./part-default-open"
-import { animate } from "motion"
 import { attached, inline, kind, typeLabel } from "./message-file"
 import { readPartText } from "./message-part-text"
 import { SessionProgressIndicatorV2 } from "../v2/components/session-progress-indicator-v2"
@@ -88,39 +87,6 @@ async function writeClipboard(text: string): Promise<boolean> {
   return clipboard.writeText(text).then(
     () => true,
     () => false,
-  )
-}
-
-function ShellSubmessage(props: { text: string; animate?: boolean }) {
-  let widthRef: HTMLSpanElement | undefined
-  let valueRef: HTMLSpanElement | undefined
-
-  onMount(() => {
-    if (!props.animate) return
-    requestAnimationFrame(() => {
-      if (widthRef) {
-        animate(widthRef, { width: "auto" }, { type: "spring", visualDuration: 0.25, bounce: 0 })
-      }
-      if (valueRef) {
-        animate(valueRef, { opacity: 1, filter: "blur(0px)" }, { duration: 0.32, ease: [0.16, 1, 0.3, 1] })
-      }
-    })
-  })
-
-  return (
-    <span data-component="shell-submessage" dir="ltr">
-      <span ref={widthRef} data-slot="shell-submessage-width" style={{ width: props.animate ? "0px" : undefined }}>
-        <span data-slot="basic-tool-tool-subtitle">
-          <span
-            ref={valueRef}
-            data-slot="shell-submessage-value"
-            style={props.animate ? { opacity: 0, filter: "blur(2px)" } : undefined}
-          >
-            {props.text}
-          </span>
-        </span>
-      </span>
-    </span>
   )
 }
 
@@ -525,7 +491,7 @@ export function getToolInfo(
       return {
         icon: "console",
         title: i18n.t("ui.tool.shell"),
-        subtitle: input.command,
+        subtitle: input.description,
       }
     case "edit":
       return {
@@ -561,7 +527,8 @@ export function getToolInfo(
     case "skill":
       return {
         icon: "brain",
-        title: input.name || i18n.t("ui.tool.skill"),
+        title:
+          input.name === "melange-qcom" ? i18n.t("ui.tool.melangeSnapdragon") : input.name || i18n.t("ui.tool.skill"),
       }
     default:
       return {
@@ -604,7 +571,6 @@ function taskSession(
     .sort((a, b) => (b.time.created ?? 0) - (a.time.created ?? 0))[0]?.id
 }
 
-const CONTEXT_GROUP_TOOLS = new Set(["read", "glob", "grep", "list"])
 const HIDDEN_TOOLS = new Set(["todowrite"])
 
 function list<T>(value: T[] | undefined | null, fallback: T[]) {
@@ -619,90 +585,9 @@ function same<T>(a: readonly T[] | undefined, b: readonly T[] | undefined) {
   return a.every((x, i) => x === b[i])
 }
 
-export type PartRef = {
-  messageID: string
-  partID: string
-}
-
-export type PartGroup =
-  | {
-      key: string
-      type: "part"
-      ref: PartRef
-    }
-  | {
-      key: string
-      type: "context"
-      refs: PartRef[]
-    }
-
-function sameRef(a: PartRef, b: PartRef) {
-  return a.messageID === b.messageID && a.partID === b.partID
-}
-
-function sameGroup(a: PartGroup, b: PartGroup) {
-  if (a === b) return true
-  if (a.key !== b.key) return false
-  if (a.type !== b.type) return false
-  if (a.type === "part") {
-    if (b.type !== "part") return false
-    return sameRef(a.ref, b.ref)
-  }
-  if (b.type !== "context") return false
-  if (a.refs.length !== b.refs.length) return false
-  return a.refs.every((ref, i) => sameRef(ref, b.refs[i]!))
-}
-
-export function sameGroups(a: readonly PartGroup[] | undefined, b: readonly PartGroup[] | undefined) {
-  if (a === b) return true
-  if (!a || !b) return false
-  if (a.length !== b.length) return false
-  return a.every((item, i) => sameGroup(item, b[i]!))
-}
-
-export function groupParts(parts: { messageID: string; part: PartType }[]) {
-  const result: PartGroup[] = []
-  let start = -1
-
-  const flush = (end: number) => {
-    if (start < 0) return
-    const first = parts[start]
-    const last = parts[end]
-    if (!first || !last) {
-      start = -1
-      return
-    }
-    result.push({
-      key: `context:${first.part.id}`,
-      type: "context",
-      refs: parts.slice(start, end + 1).map((item) => ({
-        messageID: item.messageID,
-        partID: item.part.id,
-      })),
-    })
-    start = -1
-  }
-
-  parts.forEach((item, index) => {
-    if (isContextGroupTool(item.part)) {
-      if (start < 0) start = index
-      return
-    }
-
-    flush(index - 1)
-    result.push({
-      key: `part:${item.messageID}:${item.part.id}`,
-      type: "part",
-      ref: {
-        messageID: item.messageID,
-        partID: item.part.id,
-      },
-    })
-  })
-
-  flush(parts.length - 1)
-  return result
-}
+export { groupParts, sameGroups } from "./part-groups"
+import { groupParts, sameGroups, isContextGroupTool, type PartRef, type PartGroup } from "./part-groups"
+export type { PartRef, PartGroup } from "./part-groups"
 
 function index<T extends { id: string }>(items: readonly T[]) {
   return new Map(items.map((item) => [item.id, item] as const))
@@ -767,6 +652,18 @@ export function AssistantParts(props: {
 
         return (
           <Switch>
+            <Match when={entryType() === "shell"}>
+              <ShellToolGroup
+                refs={
+                  entryAccessor().type === "shell"
+                    ? (entryAccessor() as Extract<PartGroup, { refs: PartRef[] }>).refs
+                    : []
+                }
+                getPart={(ref) => part().get(ref.messageID)?.get(ref.partID)}
+                getMessage={(ref) => msgs().get(ref.messageID)}
+                busy={!!props.working && last() === entryAccessor().key}
+              />
+            </Match>
             <Match when={entryType() === "context"}>
               {(() => {
                 const parts = createMemo(
@@ -823,10 +720,6 @@ export function AssistantParts(props: {
       }}
     </Index>
   )
-}
-
-function isContextGroupTool(part: PartType): part is ToolPart {
-  return part.type === "tool" && CONTEXT_GROUP_TOOLS.has(part.tool)
 }
 
 function contextToolDetail(part: ToolPart): string | undefined {
@@ -992,6 +885,17 @@ export function AssistantMessageDisplay(props: {
 
         return (
           <Switch>
+            <Match when={entryType() === "shell"}>
+              <ShellToolGroup
+                refs={
+                  entryAccessor().type === "shell"
+                    ? (entryAccessor() as Extract<PartGroup, { refs: PartRef[] }>).refs
+                    : []
+                }
+                getPart={(ref) => part().get(ref.partID)}
+                getMessage={() => props.message}
+              />
+            </Match>
             <Match when={entryType() === "context"}>
               {(() => {
                 const parts = createMemo(
@@ -1037,6 +941,42 @@ export function AssistantMessageDisplay(props: {
         )
       }}
     </Index>
+  )
+}
+
+export function ShellToolGroup(props: {
+  refs: PartRef[]
+  getPart: (ref: PartRef) => PartType | undefined
+  getMessage: (ref: PartRef) => AssistantMessage | undefined
+  busy?: boolean
+}) {
+  const i18n = useI18n()
+  const tools = createMemo(() =>
+    props.refs.map(props.getPart).filter((part): part is ToolPart => part?.type === "tool"),
+  )
+  const pending = () =>
+    props.busy || tools().some((part) => part.state.status === "pending" || part.state.status === "running")
+  const failed = () => tools().some((part) => part.state.status === "error")
+  return (
+    <BasicTool
+      icon="console"
+      allowOpenWhilePending
+      status={pending() ? "running" : "completed"}
+      trigger={{
+        title: i18n.t(
+          pending() ? "ui.shellGroup.running" : failed() ? "ui.shellGroup.failed" : "ui.shellGroup.completed",
+          { count: tools().length },
+        ),
+      }}
+    >
+      <For each={props.refs}>
+        {(ref) => (
+          <Show when={props.getPart(ref) && props.getMessage(ref)}>
+            <Part part={props.getPart(ref)!} message={props.getMessage(ref)!} defaultOpen={false} />
+          </Show>
+        )}
+      </For>
+    </BasicTool>
   )
 }
 
@@ -2086,8 +2026,6 @@ ToolRegistry.register({
   name: "shell",
   render(props) {
     const i18n = useI18n()
-    const pending = () => props.status === "pending" || props.status === "running"
-    const sawPending = pending()
     const text = createMemo(() => {
       const cmd = props.input.command ?? props.metadata.command ?? ""
       const out = stripAnsi(props.output || props.metadata.output || "").replace(/\r\n?/g, "\n")
@@ -2109,18 +2047,7 @@ ToolRegistry.register({
         {...props}
         icon="console"
         allowOpenWhilePending
-        trigger={(open) => (
-          <div data-slot="basic-tool-tool-info-structured">
-            <div data-slot="basic-tool-tool-info-main">
-              <span data-slot="basic-tool-tool-title">
-                <TextShimmer text={i18n.t("ui.tool.shell")} active={pending()} />
-              </span>
-              <Show when={!open() && props.input.command}>
-                <ShellSubmessage text={props.input.command} animate={sawPending} />
-              </Show>
-            </div>
-          </div>
-        )}
+        trigger={{ title: props.input.description || i18n.t("ui.tool.shell") }}
       >
         <div data-component="bash-output" dir="ltr">
           <div data-slot="bash-copy">
@@ -2622,7 +2549,11 @@ ToolRegistry.register({
   name: "skill",
   render(props) {
     const i18n = useI18n()
-    const title = createMemo(() => props.input.name || i18n.t("ui.tool.skill"))
+    const title = createMemo(() =>
+      props.input.name === "melange-qcom"
+        ? i18n.t("ui.tool.melangeSnapdragon")
+        : props.input.name || i18n.t("ui.tool.skill"),
+    )
     const running = createMemo(() => props.status === "pending" || props.status === "running")
 
     const titleContent = () => <TextShimmer text={title()} active={running()} />
@@ -2638,5 +2569,56 @@ ToolRegistry.register({
     )
 
     return <BasicTool icon="brain" status={props.status} trigger={trigger()} hideDetails />
+  },
+})
+
+ToolRegistry.register({
+  name: "melange_prepare_model",
+  render(props) {
+    const i18n = useI18n()
+    const reveal = props.metadata.phase !== "selected"
+    const revealChart = (element: HTMLDivElement) => {
+      if (!reveal) return
+      const show = () => {
+        if (!element.querySelector('svg[role="img"]')) return
+        observer.disconnect()
+        element.dispatchEvent(new CustomEvent("opencode:hold-scroll", { bubbles: true }))
+        requestAnimationFrame(() => {
+          element.scrollIntoView({ behavior: "instant", block: "start" })
+          if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches)
+            element.animate(
+              [
+                { opacity: 0, transform: "translateY(12px)" },
+                { opacity: 1, transform: "translateY(0)" },
+              ],
+              { duration: 450 },
+            )
+        })
+      }
+      const observer = new MutationObserver(show)
+      observer.observe(element, { childList: true, subtree: true })
+      show()
+      onCleanup(() => observer.disconnect())
+    }
+    return (
+      <BasicTool
+        {...props}
+        icon="brain"
+        trigger={{ title: props.metadata.phase === "selected" ? props.metadata.model : i18n.t("ui.tool.questions") }}
+        defaultOpen
+      >
+        <Show when={props.output && props.metadata.phase === "selected"}>
+          <div
+            ref={revealChart}
+            data-component="tool-output"
+            style={{ "white-space": "normal", width: "100%", "scroll-margin-top": "72px" }}
+          >
+            <Markdown
+              text={typeof props.metadata.visualization === "string" ? props.metadata.visualization : props.output!}
+            />
+          </div>
+        </Show>
+      </BasicTool>
+    )
   },
 })

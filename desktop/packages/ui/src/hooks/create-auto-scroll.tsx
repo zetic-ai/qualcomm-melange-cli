@@ -12,6 +12,7 @@ export interface AutoScrollOptions {
 
 export function createAutoScroll(options: AutoScrollOptions) {
   let settling = false
+  let held = false
   let settleTimer: ReturnType<typeof setTimeout> | undefined
   let autoTimer: ReturnType<typeof setTimeout> | undefined
   let auto: { top: number; time: number } | undefined
@@ -77,6 +78,7 @@ export function createAutoScroll(options: AutoScrollOptions) {
   }
 
   const scrollToBottom = (force: boolean) => {
+    if (force) held = false
     if (!force && !active()) return
 
     if (force && store.userScrolled) setStore("userScrolled", false)
@@ -111,6 +113,7 @@ export function createAutoScroll(options: AutoScrollOptions) {
   }
 
   const handleWheel = (e: WheelEvent) => {
+    held = false
     if (e.deltaY >= 0) return
     // If the user is scrolling within a nested scrollable region (tool output,
     // code block, etc), don't treat it as leaving the "follow bottom" mode.
@@ -123,6 +126,7 @@ export function createAutoScroll(options: AutoScrollOptions) {
   }
 
   const handleScroll = () => {
+    if (held) return
     const el = store.scrollRef
     if (!el) return
 
@@ -172,6 +176,7 @@ export function createAutoScroll(options: AutoScrollOptions) {
   createResizeObserver(
     () => store.contentRef,
     () => {
+      if (held) return
       const el = store.scrollRef
       if (el && !canScroll(el)) {
         if (store.userScrolled) setStore("userScrolled", false)
@@ -214,6 +219,29 @@ export function createAutoScroll(options: AutoScrollOptions) {
   })
 
   createEventListener(() => store.scrollRef, "wheel", handleWheel, { passive: true })
+  createEventListener(
+    () => store.scrollRef,
+    "pointerdown",
+    () => {
+      held = false
+    },
+    { passive: true },
+  )
+  createEventListener(
+    () => store.scrollRef,
+    "keydown",
+    () => {
+      held = false
+    },
+  )
+  createEventListener(
+    () => store.scrollRef,
+    "opencode:hold-scroll",
+    () => {
+      held = true
+      setStore("userScrolled", true)
+    },
+  )
 
   onCleanup(() => {
     if (settleTimer) clearTimeout(settleTimer)

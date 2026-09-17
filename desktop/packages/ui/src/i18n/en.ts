@@ -1,4 +1,5 @@
 export const dict: Record<string, string> = {
+  "ui.tool.melangeSnapdragon": "Melange For Snapdragon",
   "ui.sessionReview.title": "Session changes",
   "ui.sessionReview.title.git": "Git changes",
   "ui.sessionReview.title.branch": "Branch changes",
@@ -90,6 +91,9 @@ export const dict: Record<string, string> = {
   "ui.sessionTurn.status.searchingWeb": "Searching the web",
   "ui.sessionTurn.status.makingEdits": "Making edits",
   "ui.sessionTurn.status.runningCommands": "Running commands",
+  "ui.shellGroup.running": "Working · {{count}} executions",
+  "ui.shellGroup.completed": "Completed · {{count}} executions",
+  "ui.shellGroup.failed": "Errors · {{count}} executions",
   "ui.sessionTurn.status.thinking": "Thinking",
   "ui.sessionTurn.status.thinkingWithTopic": "Thinking - {{topic}}",
   "ui.sessionTurn.status.gatheringThoughts": "Gathering thoughts",

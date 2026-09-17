@@ -1,4 +1,14 @@
 export const dict = {
+  "prompt.demo.translation.label": "실시간 번역앱",
+  "prompt.demo.translation.description": "기기에서 바로 번역",
+  "prompt.demo.translation.prompt": "Build an on-device real time translation app",
+  "prompt.demo.image.label": "이미지 분석 앱",
+  "prompt.demo.image.description": "사진 속 장면과 사물 이해",
+  "prompt.demo.image.prompt": "Build an on-device vision app that describes photos and answers questions about them.",
+  "prompt.demo.appliance.label": "가전제품 제어 에이전트 앱",
+  "prompt.demo.appliance.description": "자연어로 가전제품 제어",
+  "prompt.demo.appliance.prompt":
+    "Build an on-device agent that controls home appliances through natural-language commands.",
   "command.category.suggested": "추천",
   "command.category.view": "보기",
   "command.category.project": "프로젝트",

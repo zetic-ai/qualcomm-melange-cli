@@ -1,4 +1,5 @@
 export const dict = {
+  "ui.tool.melangeSnapdragon": "Melange For Snapdragon",
   "ui.sessionReview.title": "세션 변경 사항",
   "ui.sessionReview.title.lastTurn": "마지막 턴 변경 사항",
   "ui.sessionReview.diffStyle.unified": "통합 보기",
@@ -64,6 +65,9 @@ export const dict = {
   "ui.sessionTurn.status.searchingWeb": "웹 검색 중",
   "ui.sessionTurn.status.makingEdits": "편집 수행 중",
   "ui.sessionTurn.status.runningCommands": "명령어 실행 중",
+  "ui.shellGroup.running": "작업 진행 중 · {{count}}개 실행",
+  "ui.shellGroup.completed": "작업 완료 · {{count}}개 실행",
+  "ui.shellGroup.failed": "오류 있음 · {{count}}개 실행",
   "ui.sessionTurn.status.thinking": "생각 중",
   "ui.sessionTurn.status.thinkingWithTopic": "생각 중 - {{topic}}",
   "ui.sessionTurn.status.gatheringThoughts": "생각 정리 중",

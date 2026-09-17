@@ -16,8 +16,8 @@ import { isServer, render } from "solid-js/web"
 import { Icon as IconV2 } from "@opencode-ai/ui/v2/icon"
 import { IconButtonV2 } from "@opencode-ai/ui/v2/icon-button-v2"
 import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
-import { canReusePendingBlock, completedProjection } from "./markdown-projection"
-import type { Block, Projection } from "./markdown-stream"
+import { canReusePendingBlock } from "./markdown-projection"
+import { stream, type Block, type Projection } from "./markdown-stream"
 import {
   disposeMarkdownProjection,
   disposeStreamingCode,
@@ -68,6 +68,8 @@ function fallback(markdown: string) {
 }
 
 async function code(text: string, language: string | undefined, key: string, complete = false) {
+  if (language?.toLowerCase() === "benchmark-chart")
+    return { language: "benchmark-chart", generation: 0, stable: [], unstable: [[text, ""] as MarkdownToken] }
   try {
     const result = await highlightStreamingCode(key, text, language ?? "text", complete)
     return {
@@ -389,7 +391,7 @@ export function Markdown(
     { initialValue: pendingProjection("") },
   )
   const currentProjection = () => {
-    if (!(local.streaming ?? false) && !streamed) return completedProjection(local.text)
+    if (!(local.streaming ?? false) && !streamed) return { text: local.text, blocks: stream(local.text, false) }
     const value = projection.latest
     if (value?.text === local.text) return value
     if (value?.text) return value
@@ -403,7 +405,10 @@ export function Markdown(
           key: local.cacheKey,
           projection: pendingProjection(local.text),
         }
-      const value = !(local.streaming ?? false) && !streamed ? completedProjection(local.text) : projection.latest
+      const value =
+        !(local.streaming ?? false) && !streamed
+          ? { text: local.text, blocks: stream(local.text, false) }
+          : projection.latest
       if (!value || value.text !== local.text) return
       return {
         text: local.text,
@@ -484,7 +489,7 @@ export function Markdown(
       initialValue: initialResult(
         local.text,
         local.cacheKey,
-        local.streaming ? pendingProjection(local.text) : completedProjection(local.text),
+        local.streaming ? pendingProjection(local.text) : { text: local.text, blocks: stream(local.text, false) },
         owner,
       ),
     },
@@ -632,12 +637,87 @@ function updateBlock(container: HTMLDivElement, index: number, block: RenderedBl
   })
 }
 
+type BenchmarkChartPoint = { label: string; accelerator?: string; value: number }
+type BenchmarkChartData = { title: string; metric: string; unit: string; points: BenchmarkChartPoint[] }
+
+function updateBenchmarkChart(
+  container: HTMLDivElement,
+  current: Element | undefined,
+  block: Extract<RenderedBlock, { mode: "code" }>,
+) {
+  const existing = current instanceof HTMLDivElement && current.dataset.markdownKey === block.key ? current : undefined
+  if (existing?.dataset.markdownHash === block.hash) return
+  let data: BenchmarkChartData
+  try {
+    const parsed = JSON.parse(
+      [...block.stable, ...block.unstable].map((token) => token[0]).join(""),
+    ) as Partial<BenchmarkChartData>
+    const points = Array.isArray(parsed.points)
+      ? parsed.points.filter(
+          (point): point is BenchmarkChartPoint =>
+            !!point &&
+            typeof point.label === "string" &&
+            typeof point.value === "number" &&
+            Number.isFinite(point.value),
+        )
+      : []
+    if (!parsed.title || !parsed.metric || !parsed.unit || points.length === 0) return
+    data = { title: parsed.title, metric: parsed.metric, unit: parsed.unit, points }
+  } catch {
+    return
+  }
+
+  const width = 760
+  const height = 340
+  const left = 76
+  const right = 42
+  const top = 42
+  const bottom = 92
+  const labels = [...new Set(data.points.map((point) => point.label))]
+  const groups = [...new Set(data.points.map((point) => point.accelerator ?? "default"))]
+  const colors = ["#1d9b8a", "#111111", "#5374d8", "#8f8f8f"]
+  const max = Math.max(...data.points.map((point) => point.value), 1)
+  const x = (label: string) => left + (labels.indexOf(label) / Math.max(labels.length - 1, 1)) * (width - left - right)
+  const y = (value: number) => top + (1 - value / max) * (height - top - bottom)
+  const esc = (value: string) =>
+    value.replace(/[&<>\"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[char]!)
+  const svg = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(data.title)}: ${esc(data.metric)} in ${esc(data.unit)}" style="display:block;width:100%;min-width:620px;height:auto">${Array.from(
+    { length: 5 },
+    (_, index) => {
+      const value = (max * index) / 4
+      const yy = y(value)
+      return `<line x1="${left}" x2="${width - right}" y1="${yy}" y2="${yy}" stroke="#e5e5e5" stroke-dasharray="4 6"/><text x="${left - 10}" y="${yy + 5}" text-anchor="end" fill="#666" font-size="12">${value.toFixed(1)}</text>`
+    },
+  ).join(
+    "",
+  )}<text x="${left}" y="16" fill="#444" font-size="13">${esc(data.metric === "throughput" ? "TPS" : data.metric)} (${esc(data.unit)})</text><text x="${(left + width - right) / 2}" y="${height - 6}" text-anchor="middle" fill="#444" font-size="13">${labels.every((label) => /^SM\d+/i.test(label)) ? "Snapdragon SoC" : "Device / SoC"}</text><line x1="${left}" x2="${left}" y1="${top}" y2="${height - bottom}" stroke="#aaa"/><line x1="${left}" x2="${width - right}" y1="${height - bottom}" y2="${height - bottom}" stroke="#aaa"/>${labels.map((label) => `<text x="${x(label)}" y="${height - bottom + 30}" text-anchor="middle" fill="#444" font-size="12" transform="rotate(-28 ${x(label)} ${height - bottom + 30})">${esc(label)}</text>`).join("")}${groups
+    .map((group, groupIndex) => {
+      const points = data.points.filter((point) => (point.accelerator ?? "default") === group)
+      const color = colors[groupIndex % colors.length]
+      const path = points.map((point, index) => `${index ? "L" : "M"}${x(point.label)} ${y(point.value)}`).join(" ")
+      return `<path d="${path}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round"/>${points.map((point) => `<circle cx="${x(point.label)}" cy="${y(point.value)}" r="5" fill="${color}"/><text x="${x(point.label)}" y="${y(point.value) - 12}" text-anchor="middle" fill="#111" font-size="12" font-weight="600">${point.value.toFixed(2)}</text>`).join("")}`
+    })
+    .join("")}</svg>`
+  const next = document.createElement("div")
+  next.dataset.markdownBlock = ""
+  next.dataset.markdownKey = block.key
+  next.dataset.markdownHash = block.hash
+  next.style.cssText = "background:#fff;border-radius:16px;padding:24px;color:#222;overflow:auto"
+  next.innerHTML = `<h3 style="margin:0 0 18px;font-size:20px">${esc(data.title)}</h3>${svg}<div style="display:flex;gap:18px;margin-top:8px;font-size:13px;color:#555">${groups.map((group, index) => `<span style="color:${colors[index % colors.length]}">● ${esc(group)}</span>`).join("")}</div>`
+  if (current) container.replaceChild(next, current)
+  else container.appendChild(next)
+}
+
 function updateCodeBlock(
   container: HTMLDivElement,
   current: Element | undefined,
   block: Extract<RenderedBlock, { mode: "code" }>,
   labels: CopyLabels,
 ) {
+  if (block.language.toLowerCase() === "benchmark-chart") {
+    updateBenchmarkChart(container, current, block)
+    return
+  }
   const existing = current instanceof HTMLDivElement && current.dataset.markdownKey === block.key ? current : undefined
   const next = existing ?? document.createElement("div")
   next.dataset.markdownBlock = ""
