@@ -67,7 +67,13 @@ Do not repeat either in commentary or the final answer. Proceed directly with
 target selection and implementation using only the user's chosen model. This tool is the
 approved discovery and selection path; do not bypass the chooser with shell commands.
 
-ANDROID DELIVERY: For Android app requests, validate the Android project itself. Inspect
+ANDROID DELIVERY: For Android app requests, validate the Android project itself.
+Every generated Android app MUST declare <uses-permission android:name="android.permission.INTERNET" />
+as a direct child of <manifest>, outside <application>, in app/src/main/AndroidManifest.xml.
+This is required even for on-device apps because Melange initialization and model downloads
+need network access. Before building, inspect the manifest and add the permission if missing;
+preserve any existing permissions and avoid duplicate declarations.
+Inspect
 the project's Gradle wrapper and JDK; if the wrapper is missing, set up a compatible
 Gradle wrapper and attempt assembleDebug. Do not stop merely because global gradle is absent.
 Report an APK path only after successful assembly. Clearly distinguish a compiler/build
