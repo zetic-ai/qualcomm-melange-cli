@@ -1,6 +1,6 @@
 ---
 name: melange-qcom
-description: "Use when operating the ZETIC Melange platform for Qualcomm-focused on-device AI work with the `melange-qcom` CLI or MCP server: model upload/import and conversion monitoring, Qualcomm benchmark reports, converted target selection, and Android or Flutter deployment guides. Trigger for Qualcomm device evaluation, Snapdragon/QTI benchmark questions, or Qualcomm deployment workflows. Do not use the general `melange` binary for these requests."
+description: "Use for Qualcomm on-device AI app workflows with the `melange-qcom` CLI or MCP server: public Melange model library discovery, Qualcomm benchmark reports, converted target selection, and Android or Flutter deployment guides. Trigger for app build requests that need a Qualcomm model. Never use external model catalogs or the general `melange` binary for these requests."
 ---
 
 # Melange Qualcomm
@@ -8,6 +8,36 @@ description: "Use when operating the ZETIC Melange platform for Qualcomm-focused
 Use `melange-qcom` for the complete workflow. It shares Melange accounts,
 credentials, repositories, and local state with `melange`, but filters report
 and target presentation to the reviewed Qualcomm fleet.
+
+## Public models only
+
+In the desktop app, call `melange_prepare_model` with no arguments to discover the
+public library. Then provide four task-appropriate candidates with concise strengths
+and tradeoffs, exactly one `recommended` model ID, and a question in the user's
+language. The tool validates Qualcomm benchmarks and opens a chooser that waits
+for the user's selection. Offer fewer only if fewer eligible models exist.
+Do not select a model or implement the app before the user answers. A recommendation
+is not user approval. After selection, the desktop tool card displays the chart and
+table automatically. Do not repeat either in commentary or the final response;
+continue target selection and app implementation. Never bypass this
+selection step with CLI commands, and do not proceed if the chooser is dismissed.
+
+Use only models already present in the public Melange model library. Never use
+Hugging Face or any external model catalog. Never import, upload,
+download, benchmark, or recommend a private model or private repository; if a
+candidate is private or its visibility is unknown, reject it and continue
+searching.
+
+For app-building demos, use this exact model-library sequence: run
+`melange-qcom library list --json` first and choose candidates only from its
+public results. Inspect each candidate's public library entry and associated
+ready model/report, selecting only a model with Qualcomm device measurements.
+Never start discovery with `repo list` or `model list`. Do not create a
+repository, upload a local model, import a model, or search any external catalog.
+
+When choosing a model, require a report with at least one reviewed Qualcomm
+device measurement. A model without Qualcomm benchmark data is not a candidate
+for the app workflow; keep searching or explain that no eligible model exists.
 
 ## Choose CLI or MCP
 
@@ -46,68 +76,22 @@ Resolve them in that order and never parse opaque model or target identifiers.
 
 ## Manage and convert models
 
-Check entitlement immediately before uploading:
+Inspect existing library models and their conversion state without creating or
+uploading anything:
 
 ```sh
-melange-qcom plan --jq .plan
-melange-qcom usage quotas --json
+melange-qcom repo list --json
+melange-qcom model list -R ACCOUNT/REPO --json
+model_key="$(melange-qcom model list -R ACCOUNT/REPO --jq '.results[] | select(.state=="ready") | .key' | head -n 1)"
+melange-qcom model status "$model_key" -R ACCOUNT/REPO --json
 ```
 
-If `.model_uploads.remaining == 0`, stop. Attribute the restriction to the Free
-or Lite plan only after reading `plan`; otherwise call it an exhausted monthly
-quota. `plan` is the legacy tier (`free|lite|pro|pro_plus|enterprise`); `tier`
-is the current pricing identity (`free|pro|team|enterprise`, null on legacy
-billing) and `billing_generation` (`legacy|v3`) says which system governs.
-`tier` reports what the server enforces now, so a lapsed paid subscription
-reads `free` while `billing_generation` stays `v3`. Preflight model size
-against `max_model_bytes`; a null there means a custom contract, **not** an
-unlimited one — the credit ledger still refuses runs above the self-service
-size ceiling.
+Report the current public state (`converting`, `optimizing`, `ready`, or
+`failed`) and monitor in the background. At `optimizing`, say artifacts are
+already downloadable while benchmarks finish. Never invent a percentage:
+public `progress` is null.
 
-Credits are an advisory conversion preflight: require `.credits.available > 0`
-AND `.credits.outstanding_debt == 0`, and expect the charge to grow with model
-size. Branch on the machine `error.code`, not on the status: 402
-`billing_error` is `credit_balance_exhausted` or `subscription_past_due`; 409
-`conflict_error` is `credit_debt_outstanding`; 413 `request_too_large` is
-`custom_model_too_large` (over the plan's entitlement — check
-`melange-qcom plan`) or `credit_model_too_large` (over the self-service size
-ceiling, which no credit balance buys). A refused upload completion parks the
-session resumable — remediate, then
-`melange-qcom model upload --resume SESSION_ID -R ACCOUNT/REPO`.
-
-Create a repository, validate the local manifest, then start conversion without
-blocking the user:
-
-```sh
-repo="$(melange-qcom repo create demo --private --jq .full_name)"
-melange-qcom model upload -R "$repo" model.onnx --input sample.npy --dry-run --json
-created="$(melange-qcom model upload -R "$repo" model.onnx --input sample.npy --json)"
-model_key="$(printf '%s\n' "$created" | jq -er .model.key)"
-melange-qcom model status "$model_key" -R "$repo" --json
-```
-
-For a Hugging Face model, the path depends on its type, and model type is fixed
-at `repo create`. Classify first with
-`curl -fsSL "https://huggingface.co/api/models/OWNER/NAME" | jq -r .pipeline_tag`:
-`text-generation` imports the repo id, everything else ships as artifacts.
-
-```sh
-llm_repo="$(melange-qcom repo create demo-llm --private --model-type llm --jq .full_name)"
-melange-qcom model import ORG/MODEL -R "$llm_repo" --json
-```
-
-For a general model, tell the user what the artifact path involves before
-starting it: a local export to `.pt2` plus `.npy` sample inputs, which downloads
-the weights, needs PyTorch >= 2.9, and fixes the input shape the deployed model
-will accept. Then export and upload as above. See
-<https://docs.zetic.ai/model-preparation/pytorch-export>.
-
-Do not use `--wait` while a person is waiting. Report the current public state
-(`converting`, `optimizing`, `ready`, or `failed`) and monitor in the background.
-At `optimizing`, say artifacts are already downloadable while benchmarks finish.
-Never invent a percentage: public `progress` is null.
-
-Render this phase panel after upload, import, and status checks:
+Render this phase panel after model and status checks:
 
 ```text
 ╭─ Conversion Pipeline ───────────────────────────────╮
@@ -159,8 +143,27 @@ Read and fill the matching template before answering:
 - General models: `assets/report-general.md`
 - LLMs: `assets/report-llm.md`
 
-Print the report in the reply. Preserve missing values as `-` in tables and
+The following manual report instructions apply only when the desktop
+`melange_prepare_model` tool card has NOT already displayed a report. In the
+desktop selection workflow, the card is the sole chart/table output; skip these
+manual rendering instructions and proceed with implementation.
+
+For a manual report, print the report in the reply. Preserve missing values as `-` in tables and
 `N/A` in cards. Never compare metrics from different accelerators as a speedup.
+
+Visualize the benchmark before choosing a target. Show a compact chart or
+ranked bar visualization for latency, throughput, memory, and quality when
+available, grouped by Qualcomm device and accelerator. Include the raw values
+in a table beside the visualization, preserve missing values, and label units.
+Do not create an SVG file or Markdown image link. Do not use ASCII or Markdown
+bars, invent values, or compare incompatible metrics. Emit the chart data in
+this exact fenced format so the desktop UI can render it:
+
+````markdown
+```benchmark-chart
+{"title":"Qualcomm Snapdragon","metric":"throughput","unit":"TPS","points":[{"label":"SM8475","accelerator":"CPU","value":43.4}]}
+```
+````
 
 ## Select Qualcomm targets
 
@@ -206,17 +209,5 @@ placeholder; never interpolate, print, or persist the active credential.
 General-model tensor construction may remain a TODO when shapes and
 preprocessing are model-specific.
 
-## Resume interrupted uploads
-
-Prefer the resume command printed when exit 130 occurred. Otherwise locate the
-active session and resume by its opaque id:
-
-```sh
-session_id="$(melange-qcom model upload --sessions -R "$repo" \
-  --jq '.results | map(select(.state=="CREATED" or .state=="UPLOADING")) | first | .id // empty')"
-test -n "$session_id"
-melange-qcom model upload --resume "$session_id" -R "$repo"
-```
-
-Run uploads with `--dry-run` first, never retry exit 2 or 4, and never present a
-metric or device classification the filtered response did not carry.
+Never present a metric or device classification the filtered response did not
+carry.

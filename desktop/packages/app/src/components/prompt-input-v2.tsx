@@ -14,6 +14,7 @@ import { normalizePromptHistoryEntry, promptLength, type PromptHistoryComment } 
 import { createPersistedPromptInputHistory } from "@/components/prompt-input/history-store"
 import { promptDesignPlaceholder, promptPlaceholder } from "@/components/prompt-input/placeholder"
 import { createPromptSubmit } from "@/components/prompt-input/submit"
+import { DemoPrompts } from "./demo-prompts"
 import { selectionFromLines, type SelectedLineRange, useFile } from "@/context/file"
 import { useComments } from "@/context/comments"
 import { useCommand } from "@/context/command"
@@ -42,6 +43,9 @@ export type PromptInputV2ComposerProps = {
 export type PromptInputV2ControllerProps = Omit<PromptInputProps, "class" | "submission">
 export type PromptInputV2ComposerController = PromptInputV2Interaction & {
   readonly model: PromptInputProps["controls"]["model"]
+  readonly demoDisabled: boolean
+  readonly demoHidden: boolean
+  sendDemo: (text: string) => void
 }
 
 export function PromptInputV2Composer(props: PromptInputV2ComposerProps) {
@@ -51,6 +55,11 @@ export function PromptInputV2Composer(props: PromptInputV2ComposerProps) {
 
   return (
     <div class="flex flex-col gap-3">
+      <DemoPrompts
+        hidden={props.controller.demoHidden}
+        disabled={props.controller.demoDisabled}
+        onSend={props.controller.sendDemo}
+      />
       <PromptInputV2
         controller={props.controller}
         borderUnderlay={props.borderUnderlay}
@@ -409,6 +418,22 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
     },
   })
   Object.defineProperty(controller, "model", { get: () => props.controls.model })
+  Object.defineProperty(controller, "demoHidden", {
+    get: () => (sync().data.message[props.controls.session.id ?? ""] ?? []).some((message) => message.role === "user"),
+  })
+  Object.defineProperty(controller, "demoDisabled", {
+    get: () =>
+      !prompt.ready() ||
+      working() ||
+      prompt.current().some((part) => part.type !== "text" || part.content.trim().length > 0),
+  })
+  Object.defineProperty(controller, "sendDemo", {
+    value: (text: string) => {
+      controller.dispatch({ type: "mode.normal" })
+      prompt.set([{ type: "text", content: text, start: 0, end: text.length }], text.length)
+      void submission.handleSubmit(new Event("submit"))
+    },
+  })
 
   command.register("prompt-input", () => [
     {

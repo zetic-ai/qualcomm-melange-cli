@@ -1,6 +1,16 @@
 import { DESKTOP_NATIVE_ENGLISH } from "./desktop-native"
 
 export const dict = {
+  "prompt.demo.translation.label": "Real-time translation app",
+  "prompt.demo.translation.description": "Translate instantly on device",
+  "prompt.demo.translation.prompt": "Build an on-device real time translation app",
+  "prompt.demo.image.label": "Image analysis app",
+  "prompt.demo.image.description": "Understand scenes and objects",
+  "prompt.demo.image.prompt": "Build an on-device vision app that describes photos and answers questions about them.",
+  "prompt.demo.appliance.label": "Home appliance agent app",
+  "prompt.demo.appliance.description": "Control appliances with natural language",
+  "prompt.demo.appliance.prompt":
+    "Build an on-device agent that controls home appliances through natural-language commands.",
   ...DESKTOP_NATIVE_ENGLISH,
   "command.category.suggested": "Suggested",
   "command.category.view": "View",

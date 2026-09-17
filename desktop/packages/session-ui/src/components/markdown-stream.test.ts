@@ -3,6 +3,15 @@ import { canReusePendingBlock } from "./markdown-projection"
 import { project, stream } from "./markdown-stream"
 
 describe("markdown stream", () => {
+  test("preserves benchmark charts as code blocks after reload and streaming", () => {
+    const data = { title: "Qualcomm", metric: "throughput", unit: "tokens/s", points: [{ label: "SM8550", value: 30 }] }
+    const text = "Report\n\n```benchmark-chart\n" + JSON.stringify(data) + "\n```\n\nDone"
+    for (const blocks of [stream(text, false), project(undefined, text, false).blocks, stream(text, true)]) {
+      const chart = blocks.find((block) => block.language === "benchmark-chart")!
+      expect(chart.mode).toBe("code")
+      expect(JSON.parse(chart.src)).toEqual(data)
+    }
+  })
   test("heals incomplete emphasis while streaming", () => {
     expect(stream("hello **world", true)).toEqual([{ raw: "hello **world", src: "hello **world**", mode: "live" }])
     expect(stream("say `code", true)).toEqual([{ raw: "say `code", src: "say `code`", mode: "live" }])

@@ -1949,10 +1949,7 @@ export default function Page() {
       if (next === dockHeight) return
 
       const el = scroller
-      const delta = next - dockHeight
-      const stick = el
-        ? !autoScroll.userScrolled() || el.scrollHeight - el.clientHeight - el.scrollTop < 10 + Math.max(0, delta)
-        : false
+      const stick = el ? !autoScroll.userScrolled() : false
 
       dockHeight = next
 
