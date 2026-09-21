@@ -7,6 +7,11 @@ name: Melange Agent Windows on Arm smoke test
 
 on:
   workflow_dispatch:
+    inputs:
+      artifact_run_id:
+        description: "Reuse the installer artifact from this workflow run id instead of building"
+        required: false
+        default: ""
   push:
     branches: ["smoke/**"]
     paths:
@@ -23,6 +28,7 @@ concurrency:
 jobs:
   build:
     name: Cross-build installer on macOS arm64
+    if: ${{ inputs.artifact_run_id == '' }}
     runs-on: macos-15
     timeout-minutes: 60
     steps:
@@ -70,6 +76,7 @@ jobs:
   smoke:
     name: Install and launch on Windows 11 Arm64
     needs: build
+    if: ${{ always() && (needs.build.result == 'success' || inputs.artifact_run_id != '') }}
     runs-on: windows-11-arm
     timeout-minutes: 30
     steps:
@@ -77,6 +84,14 @@ jobs:
         with:
           name: melange-agent-win-arm64
           path: installer
+          run-id: ${{ inputs.artifact_run_id || github.run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Defender state before install
+        shell: pwsh
+        run: |
+          Get-MpComputerStatus | Select-Object AMRunningMode, RealTimeProtectionEnabled, AntivirusEnabled | Format-List
+          Get-MpPreference | Select-Object DisableRealtimeMonitoring, ExclusionPath | Format-List
 
       - name: Host facts
         shell: pwsh
@@ -96,6 +111,11 @@ jobs:
           if (-not (Test-Path $app)) {
             "Melange Agent.exe not found; contents of Programs:"
             Get-ChildItem (Join-Path $env:LOCALAPPDATA 'Programs') -Recurse -Depth 1 | Select-Object FullName
+            "--- Defender detections ---"
+            Get-MpThreatDetection | Format-List
+            Get-MpThreat | Format-List
+            "--- Installer payload entries (exe/dll) as seen by 7z on this runner ---"
+            & 7z l $setup | Select-String -Pattern '\.exe|\.dll|\.7z' | Select-Object -First 15
             exit 1
           }
           "installed: $app"
