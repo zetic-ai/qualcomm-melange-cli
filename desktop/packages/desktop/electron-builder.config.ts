@@ -16,6 +16,21 @@ export function foreignNativePackages(key: string) {
   return NATIVE_FAMILIES.map((family) => `!node_modules/${family}-!(${key})/**`)
 }
 
+/**
+ * The 7-Zip that electron-builder downloads (24.x) applies its ARM64 branch
+ * filter to Arm64 PE files, but the NSIS extraction plugin uses an old 7-Zip
+ * decoder that does not know that filter: the installer then finishes with
+ * exit code 0 and silently omits every .exe and .dll. Disable branch filters
+ * for Windows payloads (costs a few MB of compression, nothing else).
+ */
+export function sevenZipFilterFor(os: string) {
+  return os === "win32" ? "off" : undefined
+}
+
+if (sevenZipFilterFor(target.os) && !process.env.ELECTRON_BUILDER_7Z_FILTER) {
+  process.env.ELECTRON_BUILDER_7Z_FILTER = sevenZipFilterFor(target.os)
+}
+
 // electron-builder's Arch enum (builder-util): ia32 = 0, x64 = 1, armv7l = 2, arm64 = 3, universal = 4.
 const ARCH_NAMES: Record<number, string> = { 1: "x64", 3: "arm64" }
 

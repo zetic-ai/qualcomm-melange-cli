@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import type { Configuration } from "electron-builder"
-import config, { foreignNativePackages, packagingGuard } from "./electron-builder.config"
+import config, { foreignNativePackages, packagingGuard, sevenZipFilterFor } from "./electron-builder.config"
 
 const value = config as Configuration
 
@@ -52,4 +52,9 @@ test("refuses to package a bundle built for another platform", async () => {
   const win = packagingGuard(async () => ({ os: "win32", arch: "x64" }))
   await expect(win({ electronPlatformName: "win32", arch: 1 })).resolves.toBeUndefined()
   await expect(win({ electronPlatformName: "win32", arch: 3 })).rejects.toThrow(/win32-x64.*win32-arm64/)
+})
+
+test("disables 7-Zip branch filters for Windows payloads so NSIS can extract Arm64 executables", () => {
+  expect(sevenZipFilterFor("win32")).toBe("off")
+  expect(sevenZipFilterFor("darwin")).toBeUndefined()
 })
