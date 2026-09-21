@@ -1,4 +1,4 @@
-import { join } from "node:path"
+import { delimiter, join } from "node:path"
 
 /**
  * Command the main process spawns for `melange-qcom auth ...`.
@@ -28,4 +28,26 @@ export function melangePathEntries(resourceRoot: string, platform: NodeJS.Platfo
   const entries = [join(resourceRoot, "launcher")]
   if (platform === "win32") entries.push(join(resourceRoot, "bin"))
   return entries
+}
+
+/**
+ * Name of the search-path variable in `env`. Node's `process.env` is
+ * case-insensitive on Windows, but a plain copy of it keeps the key Windows
+ * actually uses, usually `Path`, so `copy.PATH` is undefined there. Reading
+ * that and writing `PATH` back replaced the whole search path with just the
+ * launcher and bin directories, and every agent shell lost System32.
+ */
+export function pathKey(env: Record<string, string | undefined>) {
+  return Object.keys(env).find((key) => key.toUpperCase() === "PATH") ?? "PATH"
+}
+
+/** The launcher and bin entries followed by the user's existing search path, if any. */
+export function melangePath(
+  resourceRoot: string,
+  env: Record<string, string | undefined>,
+  platform: NodeJS.Platform = process.platform,
+  separator = delimiter,
+) {
+  const current = env[pathKey(env)]
+  return [...melangePathEntries(resourceRoot, platform), ...(current ? [current] : [])].join(separator)
 }
