@@ -155,6 +155,17 @@ launch and some endpoint protection may quarantine the download. Sign the
 installer and `Melange Agent.exe` with an EV or OV code-signing certificate
 before broad distribution.
 
+## Data isolation from other OpenCode installs
+
+The bundled server keeps its database, config, auth, cache and state under the
+app's own user-data directory (`%APPDATA%\ai.zetic.melange-agent\opencode` on
+Windows, `~/Library/Application Support/ai.zetic.melange-agent/opencode` on
+macOS) by setting `OPENCODE_STORAGE_ROOT` for the sidecar. It never opens the
+shared `~/.local/share/opencode` or `~/.config/opencode` that an upstream
+OpenCode CLI or desktop uses, so a different OpenCode version on the same
+machine cannot break startup ("Database is not empty and has no session
+table") or inject its global AGENTS.md and skills into a session.
+
 ## Development
 
 Run the desktop app from `desktop/packages/desktop`:

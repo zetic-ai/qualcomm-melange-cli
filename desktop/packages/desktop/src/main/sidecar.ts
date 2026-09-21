@@ -1,6 +1,8 @@
 import * as http from "node:http"
 import * as tls from "node:tls"
 
+import { opencodeStorageRoot } from "./storage-root"
+
 type NodeHttpWithEnvProxy = typeof http & {
   setGlobalProxyFromEnv: () => void
 }
@@ -84,6 +86,8 @@ function prepareSidecarEnv(password: string, userDataPath: string) {
   Object.assign(process.env, {
     OPENCODE_SERVER_USERNAME: "opencode",
     OPENCODE_SERVER_PASSWORD: password,
+    // Must be set before the server module is imported: it fixes the paths at load time.
+    OPENCODE_STORAGE_ROOT: opencodeStorageRoot(userDataPath),
     XDG_STATE_HOME: process.env.XDG_STATE_HOME ?? userDataPath,
   })
 }

@@ -160,6 +160,23 @@ jobs:
           # Exit 4 ("not logged in") is the expected answer on a fresh machine; do not let it fail the step.
           exit 0
 
+      - name: Simulate a PC that already runs upstream OpenCode
+        shell: pwsh
+        run: |
+          # The customer's Snapdragon laptop had OpenCode CLI 2.0.11 installed. Its database at
+          # ~\.local\share\opencode\opencode.db has no `session` table, and ~\.config\opencode
+          # carries a global AGENTS.md. Melange Agent must ignore both.
+          $foreign = Join-Path $env:USERPROFILE '.local\share\opencode'
+          New-Item -ItemType Directory -Force -Path $foreign | Out-Null
+          $db = Join-Path $foreign 'opencode.db'
+          node --experimental-sqlite -e "const { DatabaseSync } = require('node:sqlite'); const d = new DatabaseSync(process.argv[1]); d.exec('CREATE TABLE migration_v2 (id TEXT PRIMARY KEY); CREATE TABLE session_entry (id TEXT PRIMARY KEY)'); d.close()" $db
+          $cfg = Join-Path $env:USERPROFILE '.config\opencode'
+          New-Item -ItemType Directory -Force -Path $cfg | Out-Null
+          Set-Content (Join-Path $cfg 'opencode.json') '{"$schema":"https://opencode.ai/config.json","instructions":["FOREIGN-AGENTS.md"]}'
+          Set-Content (Join-Path $cfg 'AGENTS.md') 'FOREIGN OPENCODE INSTRUCTIONS: Melange Agent must never load this file.'
+          (Get-FileHash $db).Hash | Set-Content foreign-db.sha256
+          "planted foreign OpenCode database at $db and config at $cfg"
+
       - name: Launch the app and wait for the main process to finish loading
         shell: pwsh
         run: |
@@ -193,10 +210,31 @@ jobs:
           if (-not $ok) { "app never logged 'loading task finished'"; exit 1 }
           "OK: main process finished loading on Windows on Arm"
 
+      - name: Verify the app used its own storage root and left upstream OpenCode alone
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:APPDATA 'ai.zetic.melange-agent\opencode'
+          $ours = Join-Path $root 'data\opencode.db'
+          if (-not (Test-Path $ours)) {
+            "app database not found at $ours"
+            Get-ChildItem $root -Recurse -ErrorAction SilentlyContinue | Select-Object FullName
+            exit 1
+          }
+          "app database: $ours"
+          $db = Join-Path $env:USERPROFILE '.local\share\opencode\opencode.db'
+          if ((Get-FileHash $db).Hash -ne (Get-Content foreign-db.sha256)) { "foreign OpenCode database was modified"; exit 1 }
+          $serverLogs = Get-ChildItem (Join-Path $root 'data\log') -Filter *.log -ErrorAction SilentlyContinue
+          "server logs: $($serverLogs.Count)"
+          $leak = $serverLogs | Select-String -Pattern '\.config\\opencode|\.local\\share\\opencode' | Select-Object -First 3
+          if ($leak) { "server touched the shared OpenCode directories:"; $leak; exit 1 }
+          "OK: isolated storage root in use; upstream OpenCode files untouched"
+
       - name: Type a prompt into the app and wait for the model's reply
         shell: pwsh
         env:
           EVIDENCE_DIR: ${{ github.workspace }}\artifacts
+          # The model's first answer and tool run are enough here; scaffolding continues past this.
+          SMOKE_REPLY_TIMEOUT_MS: "300000"
         run: |
           $work = Join-Path $env:RUNNER_TEMP 'ui-driver'
           New-Item -ItemType Directory -Force -Path $work | Out-Null
