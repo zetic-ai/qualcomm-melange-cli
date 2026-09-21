@@ -13,3 +13,19 @@ export function melangeCommandFor(resourceRoot: string, platform: NodeJS.Platfor
   if (platform === "win32") return join(resourceRoot, "bin", "melange-qcom.exe")
   return join(resourceRoot, "launcher", "melange-qcom")
 }
+
+/**
+ * Directories prepended to PATH for agent shells and sidecar tools.
+ *
+ * `launcher/` comes first so cmd.exe and PowerShell, which try every PATHEXT
+ * in a directory before moving on, run the `.cmd` launcher. Node's execFile
+ * and spawn only match `.exe`/`.com` and cannot run a `.cmd` without a shell,
+ * so on Windows `bin/` follows: tools such as melange_prepare_model that call
+ * `execFileSync("melange-qcom", ...)` fall through to `bin\melange-qcom.exe`
+ * instead of failing with ENOENT.
+ */
+export function melangePathEntries(resourceRoot: string, platform: NodeJS.Platform = process.platform) {
+  const entries = [join(resourceRoot, "launcher")]
+  if (platform === "win32") entries.push(join(resourceRoot, "bin"))
+  return entries
+}
