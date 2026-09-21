@@ -133,6 +133,8 @@ jobs:
           $exe = Join-Path $root 'bin\melange-qcom.exe'
           $status = & $exe auth status --json 2>&1
           "auth status -> [$LASTEXITCODE] $status"
+          # Exit 4 ("not logged in") is the expected answer on a fresh machine; do not let it fail the step.
+          exit 0
 
       - name: Launch the app and wait for the main process to finish loading
         shell: pwsh
