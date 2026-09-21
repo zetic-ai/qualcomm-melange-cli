@@ -221,7 +221,7 @@ jobs:
           $logRoot = Join-Path $env:APPDATA 'ai.zetic.melange-agent\logs'
           if (Test-Path $logRoot) { Copy-Item $logRoot artifacts\logs -Recurse }
           Get-Process | Where-Object { $_.ProcessName -like 'Melange*' } | Stop-Process -Force -ErrorAction SilentlyContinue
-          if (Test-Path artifacts\ui-summary.json) { Get-Content artifacts\ui-summary.json }
+          if (Test-Path artifacts\ui-reply.md) { Get-Content artifacts\ui-reply.md }
 
       - uses: actions/upload-artifact@v4
         if: always()

@@ -99,7 +99,13 @@ async function waitReply(page, before, pattern, timeoutMs, settleMs = 15_000) {
   throw new Error(`no matching reply within ${timeoutMs / 1000}s`)
 }
 
-const summary = { pong: "pending", library: "pending" }
+const PROMPT =
+  process.env.SMOKE_PROMPT ?? "build an on-device vision app that describes photos and answers questions about them."
+// A real agent turn can run tools and take a while; stop once the reply has been quiet for 45 s.
+const REPLY_TIMEOUT_MS = 12 * 60_000
+const REPLY_SETTLE_MS = 45_000
+
+const summary = { prompt: PROMPT, reply: "pending" }
 const browser = await connect()
 try {
   const page = await appPage(browser)
@@ -109,28 +115,20 @@ try {
   const prompt = await reachPrompt(page)
   await snap(page, "ui-02-prompt-ready")
 
-  const before = await send(page, prompt, "Reply with exactly the single word PONG and nothing else.")
-  const reply = await waitReply(page, before, /\bPONG\b/, 180_000)
-  summary.pong = reply.slice(0, 200)
-  log("reply 1:", JSON.stringify(summary.pong))
-  await snap(page, "ui-03-reply-pong")
-
-  // Exercises the bundled Qualcomm CLI and the Melange PAT through the agent's tools.
-  // Recorded as evidence; not yet required for a green run.
+  const before = await send(page, prompt, PROMPT)
+  await sleep(10_000)
+  await snap(page, "ui-03-prompt-sent")
+  const reply = await waitReply(page, before, null, REPLY_TIMEOUT_MS, REPLY_SETTLE_MS)
+  summary.reply = reply
+  writeFileSync(`${OUT}/ui-reply.md`, `# Prompt\n\n${PROMPT}\n\n# Reply (visible text of the assistant turn)\n\n${reply}\n`)
+  log("reply length:", reply.length)
+  log("reply:\n" + reply)
+  await snap(page, "ui-04-reply")
   try {
-    const before2 = await send(
-      page,
-      prompt,
-      "Which models are available in my Qualcomm Melange library? Use the Melange tools to look, then list only their names.",
-    )
-    const reply2 = await waitReply(page, before2, null, 300_000)
-    summary.library = reply2.slice(0, 1000)
-    log("reply 2:", JSON.stringify(summary.library))
+    await page.screenshot({ path: `${OUT}/ui-05-reply-fullpage.png`, fullPage: true })
   } catch (error) {
-    summary.library = `soft failure: ${error.message}`
-    log(summary.library)
+    log("full-page screenshot failed:", error.message)
   }
-  await snap(page, "ui-04-reply-library")
 } finally {
   writeFileSync(`${OUT}/ui-summary.json`, JSON.stringify(summary, null, 2))
   await browser.close().catch(() => {})
