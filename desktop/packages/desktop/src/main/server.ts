@@ -1,8 +1,9 @@
-import { dirname, join } from "node:path"
+import { delimiter, dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { app, utilityProcess } from "electron"
 import type { Details } from "electron"
 import { getLogger } from "./logging"
+import { melangeCommandFor } from "./melange-command"
 import { getUserShell, loadShellEnv } from "./shell-env"
 import { getStore } from "./store"
 import { DEFAULT_SERVER_URL_KEY } from "./store-keys"
@@ -10,7 +11,9 @@ import { DEFAULT_SERVER_URL_KEY } from "./store-keys"
 export type HealthCheck = { wait: Promise<void> }
 
 type SidecarMessage =
-  { type: "ready" } | { type: "stopped" } | { type: "error"; error: { message: string; stack?: string } }
+  | { type: "ready" }
+  | { type: "stopped" }
+  | { type: "error"; error: { message: string; stack?: string } }
 
 export type SidecarListener = { stop: () => Promise<void> }
 
@@ -54,7 +57,7 @@ export function preferAppEnv(userDataPath: string) {
     MELANGE_AGENT_SKILLS_DIR: join(resourceRoot, "skill"),
     MELANGE_AGENT_XDG_STATE_HOME: userEnv.XDG_STATE_HOME ?? "",
     MELANGE_AGENT_XDG_STATE_HOME_SET: userEnv.XDG_STATE_HOME === undefined ? "0" : "1",
-    PATH: `${join(resourceRoot, "launcher")}:${userEnv.PATH ?? ""}`,
+    PATH: `${join(resourceRoot, "launcher")}${delimiter}${userEnv.PATH ?? ""}`,
     XDG_STATE_HOME: process.env.XDG_STATE_HOME ?? userDataPath,
   })
   return shellEnv
@@ -64,7 +67,7 @@ export function getMelangeCommand() {
   const resourceRoot = app.isPackaged
     ? join(process.resourcesPath, "melange-qcom")
     : join(app.getAppPath(), "resources", "melange-qcom")
-  return join(resourceRoot, "launcher", "melange-qcom")
+  return melangeCommandFor(resourceRoot)
 }
 
 export async function spawnLocalServer(
