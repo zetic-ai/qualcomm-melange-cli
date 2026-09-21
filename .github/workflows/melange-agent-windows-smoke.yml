@@ -17,6 +17,7 @@ on:
     paths:
       - "desktop/packages/desktop/**"
       - ".github/workflows/melange-agent-windows-smoke.yml"
+      - ".github/scripts/windows-smoke-prompt.mjs"
 
 permissions:
   contents: read
@@ -56,7 +57,21 @@ jobs:
           OPENCODE_CHANNEL: prod
           # electron-vite bundles the whole OpenCode server; node's default 2 GB heap is not enough on the runner.
           NODE_OPTIONS: --max-old-space-size=6144
-        run: bun run dist:win
+          # Demo-only, expiring credentials. With both set the installer is the demo build the
+          # client receives (auto sign-in, Claude Opus 5); without them it is a plain build.
+          MELANGE_DEMO_PAT: ${{ secrets.MELANGE_DEMO_PAT }}
+          MELANGE_DEMO_ANTHROPIC_KEY: ${{ secrets.MELANGE_DEMO_ANTHROPIC_KEY }}
+        run: |
+          if [ -n "$MELANGE_DEMO_PAT" ] && [ -n "$MELANGE_DEMO_ANTHROPIC_KEY" ]; then
+            key="$RUNNER_TEMP/demo-anthropic.key"
+            printf '%s' "$MELANGE_DEMO_ANTHROPIC_KEY" > "$key"
+            MELANGE_DEMO_ANTHROPIC_KEY_FILE="$key" bun run build:demo win32
+            rm -f "$key"
+            echo "demo build: yes"
+          else
+            bun run dist:win
+            echo "demo build: no (secrets missing); the UI prompt step will not get a model reply"
+          fi
 
       - name: Record what was packaged
         working-directory: desktop/packages/desktop
@@ -80,6 +95,15 @@ jobs:
     runs-on: windows-11-arm
     timeout-minutes: 30
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - uses: actions/download-artifact@v4
         with:
           name: melange-agent-win-arm64
@@ -140,7 +164,7 @@ jobs:
         shell: pwsh
         run: |
           $app = Join-Path $env:LOCALAPPDATA 'Programs\melange-agent\Melange Agent.exe'
-          $proc = Start-Process -FilePath $app -PassThru
+          $proc = Start-Process -FilePath $app -ArgumentList '--remote-debugging-port=9222' -PassThru
           "started pid $($proc.Id)"
           # userData is %APPDATA%\ai.zetic.melange-agent (src/main/index.ts) and electron-log
           # writes <userData>\logs\<run stamp>\main.log (src/main/logging.ts).
@@ -165,6 +189,28 @@ jobs:
           $errorDialog = Get-Process | Where-Object { $_.ProcessName -like 'Melange*' -and $_.MainWindowTitle -eq 'Error' }
           "--- main.log ---"
           if ($log) { "at $($log.FullName)"; Get-Content $log.FullName -Tail 80 } else { "no main.log under $logRoot"; Get-ChildItem (Split-Path $logRoot) -Recurse -ErrorAction SilentlyContinue | Select-Object FullName }
+          if ($errorDialog) { "main process error dialog is showing"; exit 1 }
+          if (-not $ok) { "app never logged 'loading task finished'"; exit 1 }
+          "OK: main process finished loading on Windows on Arm"
+
+      - name: Type a prompt into the app and wait for the model's reply
+        shell: pwsh
+        env:
+          EVIDENCE_DIR: ${{ github.workspace }}\artifacts
+        run: |
+          $work = Join-Path $env:RUNNER_TEMP 'ui-driver'
+          New-Item -ItemType Directory -Force -Path $work | Out-Null
+          Copy-Item "$env:GITHUB_WORKSPACE\.github\scripts\windows-smoke-prompt.mjs" $work
+          Push-Location $work
+          npm init -y | Out-Null
+          npm install --no-audit --no-fund playwright-core@1.59.1 | Out-Null
+          node windows-smoke-prompt.mjs
+          Pop-Location
+
+      - name: Collect evidence and stop the app
+        if: always()
+        shell: pwsh
+        run: |
           New-Item -ItemType Directory -Force -Path artifacts | Out-Null
           Add-Type -AssemblyName System.Windows.Forms, System.Drawing
           $b = [System.Windows.Forms.SystemInformation]::VirtualScreen
@@ -172,11 +218,10 @@ jobs:
           $g = [System.Drawing.Graphics]::FromImage($bmp)
           $g.CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
           $bmp.Save('artifacts\screen.png')
+          $logRoot = Join-Path $env:APPDATA 'ai.zetic.melange-agent\logs'
           if (Test-Path $logRoot) { Copy-Item $logRoot artifacts\logs -Recurse }
           Get-Process | Where-Object { $_.ProcessName -like 'Melange*' } | Stop-Process -Force -ErrorAction SilentlyContinue
-          if ($errorDialog) { "main process error dialog is showing"; exit 1 }
-          if (-not $ok) { "app never logged 'loading task finished'"; exit 1 }
-          "OK: main process finished loading on Windows on Arm"
+          if (Test-Path artifacts\ui-summary.json) { Get-Content artifacts\ui-summary.json }
 
       - uses: actions/upload-artifact@v4
         if: always()
