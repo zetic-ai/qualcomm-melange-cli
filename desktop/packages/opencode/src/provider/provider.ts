@@ -1446,6 +1446,7 @@ const layer = Layer.effect(
         const enabled = cfg.enabled_providers ? new Set(cfg.enabled_providers) : null
 
         function isProviderAllowed(providerID: ProviderV2.ID): boolean {
+          if (process.env.MELANGE_DEMO_ANTHROPIC === "1") return providerID === ProviderV2.ID.anthropic
           if (enabled && !enabled.has(providerID)) return false
           if (disabled.has(providerID)) return false
           return true
@@ -1678,6 +1679,10 @@ const layer = Layer.effect(
           const configProvider = cfg.provider?.[providerID]
 
           for (const [modelID, model] of Object.entries(provider.models)) {
+            if (process.env.MELANGE_DEMO_ANTHROPIC === "1" && modelID !== "claude-opus-5") {
+              delete provider.models[modelID]
+              continue
+            }
             model.api.id = model.api.id ?? model.id ?? modelID
 
             if (
@@ -1870,6 +1875,10 @@ const layer = Layer.effect(
     )
 
     const getModel = Effect.fn("Provider.getModel")(function* (providerID: ProviderV2.ID, modelID: ModelV2.ID) {
+      if (process.env.MELANGE_DEMO_ANTHROPIC === "1") {
+        providerID = ProviderV2.ID.anthropic
+        modelID = ModelV2.ID.make("claude-opus-5")
+      }
       const s = yield* InstanceState.get(state)
       const provider = s.providers[providerID]
       if (!provider) {
@@ -2006,6 +2015,8 @@ const layer = Layer.effect(
     })
 
     const defaultModel = Effect.fn("Provider.defaultModel")(function* () {
+      if (process.env.MELANGE_DEMO_ANTHROPIC === "1")
+        return { providerID: ProviderV2.ID.anthropic, modelID: ModelV2.ID.make("claude-opus-5") }
       const cfg = yield* config.get()
       if (cfg.model) return parseModel(cfg.model)
 

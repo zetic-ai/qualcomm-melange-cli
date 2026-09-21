@@ -383,3 +383,15 @@ body:not([data-new-layout]) [data-component="markdown"] {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+
+@keyframes benchmark-chip-reveal {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-benchmark-featured],
+  [data-benchmark-summary] {
+    animation: benchmark-chip-reveal 400ms ease-out both;
+  }
+}

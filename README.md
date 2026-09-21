@@ -39,14 +39,16 @@ QCOM asset hashes before publishing a draft.
 
 ## Melange Agent desktop
 
-[`desktop/`](desktop/) contains Melange Agent, an Apple Silicon desktop coding
-agent based on the pinned OpenCode source recorded in
+[`desktop/`](desktop/) contains Melange Agent, a desktop coding agent for
+Apple Silicon Macs and Windows on Arm (Snapdragon X) PCs, based on the pinned
+OpenCode source recorded in
 [`desktop/OPENCODE_UPSTREAM.json`](desktop/OPENCODE_UPSTREAM.json). The OpenCode
 MIT license and attribution remain in the vendored tree.
 
 There is no Melange Agent GitHub Release yet. Coworkers can build and install
 the current production app directly from this repository on an Apple Silicon
-Mac. Run `xcode-select --install` first and finish the macOS prompt, then run:
+Mac, which also produces the Windows installers. Run `xcode-select --install`
+first and finish the macOS prompt, then run:
 
 ```sh
 brew install bun cosign
@@ -55,19 +57,32 @@ cd qualcomm-melange-cli
 cd desktop
 bun install --frozen-lockfile
 cd packages/desktop
-OPENCODE_CHANNEL=prod bun run build
-OPENCODE_CHANNEL=prod bun run package:mac
+OPENCODE_CHANNEL=prod bun run dist:mac
 open dist/melange-agent-mac-arm64.dmg
 ```
 
 Drag **Melange Agent** to **Applications**. Sign-in is optional and can be
-skipped on first launch. The build is currently unsigned and supports macOS
-on Apple Silicon only.
+skipped on first launch. The build is currently unsigned.
 
-The build requires network access and `cosign`. It downloads Qualcomm
-`melange-qcom` v0.10.0 from this repository's release mirror, verifies the
-signed checksum manifest and archive hash, and packages the CLI and skill in
-the app. It does not run the global installer or modify user executable paths.
+For a Windows on Arm laptop (for example an HP OmniBook with a Snapdragon X
+Elite), build the installer on the same Mac and copy it over:
+
+```sh
+OPENCODE_CHANNEL=prod bun run dist:win
+# → dist/melange-agent-win-arm64.exe   (add --arch x64 for Windows x64 PCs)
+```
+
+Do not package a Windows installer from an `out/` directory that was built for
+macOS. The `dist:win` script keeps both stages on the same target, and
+`electron-builder` now rejects a mismatch; the symptom of the old mistake was
+`A JavaScript error occurred in the main process: Cannot find module
+'./windowsTerminal'` at launch.
+
+The build requires network access and `cosign`. It downloads the Qualcomm
+`melange-qcom` v0.10.0 archive for the target platform from this repository's
+release mirror, verifies the signed checksum manifest and archive hash, and
+packages the CLI and skill in the app. It does not run the global installer or
+modify user executable paths.
 
 Verify each locally built artifact after packaging:
 
