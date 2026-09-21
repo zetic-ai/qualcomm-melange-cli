@@ -48,6 +48,8 @@ jobs:
         working-directory: desktop/packages/desktop
         env:
           OPENCODE_CHANNEL: prod
+          # electron-vite bundles the whole OpenCode server; node's default 2 GB heap is not enough on the runner.
+          NODE_OPTIONS: --max-old-space-size=6144
         run: bun run dist:win
 
       - name: Record what was packaged
