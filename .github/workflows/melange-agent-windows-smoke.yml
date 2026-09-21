@@ -93,7 +93,7 @@ jobs:
     needs: build
     if: ${{ always() && (needs.build.result == 'success' || inputs.artifact_run_id != '') }}
     runs-on: windows-11-arm
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
@@ -222,6 +222,7 @@ jobs:
           if (Test-Path $logRoot) { Copy-Item $logRoot artifacts\logs -Recurse }
           Get-Process | Where-Object { $_.ProcessName -like 'Melange*' } | Stop-Process -Force -ErrorAction SilentlyContinue
           if (Test-Path artifacts\ui-reply.md) { Get-Content artifacts\ui-reply.md }
+          if (Test-Path artifacts\ui-transcript.txt) { "--- transcript ---"; Get-Content artifacts\ui-transcript.txt }
 
       - uses: actions/upload-artifact@v4
         if: always()

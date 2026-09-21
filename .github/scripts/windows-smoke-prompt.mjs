@@ -1,14 +1,24 @@
 // Drives the packaged Melange Agent window over the Chrome DevTools Protocol:
-// passes the first-launch gate, types a prompt into the real prompt box, and
-// waits for the assistant's reply. Run after launching the app with
-// --remote-debugging-port=9222. Requires playwright-core (no browser download).
+// passes the first-launch gate, types a prompt into the real prompt box, grants
+// the agent's permission requests, and records the assistant's reply. Run after
+// launching the app with --remote-debugging-port=9222. Requires playwright-core.
 import { mkdirSync, writeFileSync } from "node:fs"
 import { chromium } from "playwright-core"
 
 const CDP_URL = process.env.CDP_URL ?? "http://127.0.0.1:9222"
 const OUT = process.env.EVIDENCE_DIR ?? "artifacts"
+const PROMPT =
+  process.env.SMOKE_PROMPT ?? "build an on-device vision app that describes photos and answers questions about them."
+// A full agent turn runs the Qualcomm tools and may take a while. Poll every 5 s,
+// log every 30 s, and stop once the app is idle and the reply text has not changed.
+const REPLY_TIMEOUT_MS = Number(process.env.SMOKE_REPLY_TIMEOUT_MS ?? 15 * 60_000)
+const SETTLE_MS = 30_000
+
+// Stable markers in the session page (see packages/app and packages/session-ui).
 const PROMPT_INPUT = '[data-component="prompt-input"]'
-const MESSAGE = "[data-message]"
+const USER_MESSAGE = '[data-component="user-message"]'
+const TEXT_PART = '[data-component="text-part"]'
+const SUBMIT = '[data-action="prompt-submit"]'
 
 mkdirSync(OUT, { recursive: true })
 const log = (...args) => console.log(new Date().toISOString(), ...args)
@@ -40,72 +50,72 @@ async function appPage(browser) {
   throw new Error("no application page reachable over CDP")
 }
 
-async function snap(page, name) {
+async function snap(page, name, fullPage = false) {
   try {
-    await page.screenshot({ path: `${OUT}/${name}.png` })
+    await page.screenshot({ path: `${OUT}/${name}.png`, fullPage })
   } catch (error) {
     log(`screenshot ${name} failed:`, error.message)
   }
 }
 
-const pageText = (page) => page.evaluate(() => document.body.innerText.slice(0, 3000)).catch(() => "")
+const pageText = (page) => page.evaluate(() => document.body.innerText).catch(() => "")
+
+async function visible(locator) {
+  return (await locator.count()) > 0 && locator.first().isVisible()
+}
 
 async function reachPrompt(page) {
   const deadline = Date.now() + 150_000
   while (Date.now() < deadline) {
     const prompt = page.locator(PROMPT_INPUT).first()
-    if ((await prompt.count()) && (await prompt.isVisible())) return prompt
-    const gate = page.getByRole("button", { name: /^Continue( without signing in)?$/ }).first()
-    if ((await gate.count()) && (await gate.isVisible())) {
-      log("first-launch gate: clicking", JSON.stringify(await gate.innerText()))
-      await gate.click()
+    if (await visible(prompt)) return prompt
+    const gate = page.getByRole("button", { name: /^Continue( without signing in)?$/ })
+    if (await visible(gate)) {
+      log("first-launch gate: clicking", JSON.stringify(await gate.first().innerText()))
+      await gate.first().click()
     }
     await sleep(2_000)
   }
-  log("page text at timeout:\n" + (await pageText(page)))
+  log("page text at timeout:\n" + (await pageText(page)).slice(0, 3000))
   throw new Error("prompt input never became visible")
 }
 
-async function send(page, prompt, text) {
-  const before = await page.locator(MESSAGE).count()
-  await prompt.click()
-  await page.keyboard.type(text, { delay: 5 })
-  await page.keyboard.press("Enter")
-  log(`sent (${before} messages before):`, text)
-  return before
+async function assistantText(page) {
+  const parts = await page.locator(TEXT_PART).allInnerTexts().catch(() => [])
+  return parts
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join("\n\n")
 }
 
-// Waits until the reply that follows the user's own message contains `pattern`,
-// or, when pattern is null, until its text has stopped changing for `settleMs`.
-async function waitReply(page, before, pattern, timeoutMs, settleMs = 15_000) {
-  const deadline = Date.now() + timeoutMs
-  let last = ""
-  let stableSince = Date.now()
-  while (Date.now() < deadline) {
-    const messages = page.locator(MESSAGE)
-    const count = await messages.count()
-    if (count >= before + 2) {
-      const text = (await messages.nth(count - 1).innerText().catch(() => "")).trim()
-      if (text !== last) {
-        last = text
-        stableSince = Date.now()
-      }
-      if (pattern ? pattern.test(text) : text.length > 0 && Date.now() - stableSince > settleMs) return text
-    }
-    await sleep(3_000)
-  }
-  log("last reply text:", JSON.stringify(last.slice(0, 500)))
-  log("page text at timeout:\n" + (await pageText(page)))
-  throw new Error(`no matching reply within ${timeoutMs / 1000}s`)
+async function busy(page) {
+  const label = await page
+    .locator(SUBMIT)
+    .first()
+    .getAttribute("aria-label")
+    .catch(() => null)
+  return /stop/i.test(label ?? "")
 }
 
-const PROMPT =
-  process.env.SMOKE_PROMPT ?? "build an on-device vision app that describes photos and answers questions about them."
-// A real agent turn can run tools and take a while; stop once the reply has been quiet for 45 s.
-const REPLY_TIMEOUT_MS = 12 * 60_000
-const REPLY_SETTLE_MS = 45_000
+// The agent asks before touching files outside the project (the CLI's temp
+// directory, for example). A person clicks Allow in the demo; do the same here.
+async function grantPermissions(page, granted) {
+  const allow = page.getByRole("button", { name: /^Allow always$/ })
+  if (!(await visible(allow))) return false
+  const request = await page
+    .getByText("Permission required")
+    .first()
+    .locator("xpath=ancestor::*[self::div][3]")
+    .innerText()
+    .catch(() => "(could not read request)")
+  granted.push(request.replace(/\s+/g, " ").trim())
+  log("permission request:", granted.at(-1))
+  await snap(page, `ui-permission-${granted.length}`)
+  await allow.first().click()
+  return true
+}
 
-const summary = { prompt: PROMPT, reply: "pending" }
+const summary = { prompt: PROMPT, finished: false, permissions: [], reply: "" }
 const browser = await connect()
 try {
   const page = await appPage(browser)
@@ -115,20 +125,55 @@ try {
   const prompt = await reachPrompt(page)
   await snap(page, "ui-02-prompt-ready")
 
-  const before = await send(page, prompt, PROMPT)
+  const usersBefore = await page.locator(USER_MESSAGE).count()
+  await prompt.click()
+  await page.keyboard.type(PROMPT, { delay: 5 })
+  await page.keyboard.press("Enter")
+  log(`sent (${usersBefore} user messages before):`, PROMPT)
   await sleep(10_000)
   await snap(page, "ui-03-prompt-sent")
-  const reply = await waitReply(page, before, null, REPLY_TIMEOUT_MS, REPLY_SETTLE_MS)
-  summary.reply = reply
-  writeFileSync(`${OUT}/ui-reply.md`, `# Prompt\n\n${PROMPT}\n\n# Reply (visible text of the assistant turn)\n\n${reply}\n`)
-  log("reply length:", reply.length)
-  log("reply:\n" + reply)
-  await snap(page, "ui-04-reply")
-  try {
-    await page.screenshot({ path: `${OUT}/ui-05-reply-fullpage.png`, fullPage: true })
-  } catch (error) {
-    log("full-page screenshot failed:", error.message)
+  if ((await page.locator(USER_MESSAGE).count()) <= usersBefore) {
+    log("page text:\n" + (await pageText(page)).slice(0, 3000))
+    throw new Error("the prompt was not submitted (no new user message)")
   }
+
+  const deadline = Date.now() + REPLY_TIMEOUT_MS
+  let last = ""
+  let changedAt = Date.now()
+  let lastLog = 0
+  while (Date.now() < deadline) {
+    if (await grantPermissions(page, summary.permissions)) changedAt = Date.now()
+    const running = await busy(page)
+    const text = await assistantText(page)
+    if (text !== last) {
+      last = text
+      changedAt = Date.now()
+    }
+    if (Date.now() - lastLog > 30_000) {
+      lastLog = Date.now()
+      log(`running=${running} reply=${text.length} chars, tail: ${JSON.stringify(text.slice(-160))}`)
+    }
+    if (!running && text.length > 0 && Date.now() - changedAt > SETTLE_MS) {
+      summary.finished = true
+      break
+    }
+    await sleep(5_000)
+  }
+  summary.reply = last
+  if (!summary.finished) log(`agent still running after ${REPLY_TIMEOUT_MS / 1000}s; recording what it produced so far`)
+
+  const transcript = await pageText(page)
+  writeFileSync(`${OUT}/ui-transcript.txt`, transcript)
+  writeFileSync(
+    `${OUT}/ui-reply.md`,
+    `# Prompt\n\n${PROMPT}\n\n# Finished: ${summary.finished}\n\n# Permissions granted\n\n${
+      summary.permissions.map((item) => `- ${item}`).join("\n") || "(none)"
+    }\n\n# Assistant text\n\n${last}\n`,
+  )
+  log("reply:\n" + last)
+  await snap(page, "ui-04-reply")
+  await snap(page, "ui-05-reply-fullpage", true)
+  if (!last) throw new Error("the assistant produced no text")
 } finally {
   writeFileSync(`${OUT}/ui-summary.json`, JSON.stringify(summary, null, 2))
   await browser.close().catch(() => {})
