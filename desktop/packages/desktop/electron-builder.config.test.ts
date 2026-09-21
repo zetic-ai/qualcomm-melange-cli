@@ -17,6 +17,11 @@ test("packages a stable unsigned Apple Silicon Melange Agent", () => {
   expect(value.publish).toBeUndefined()
 })
 
+test("packages a portable Windows x64 Melange Agent", () => {
+  expect(value.win?.icon).toBe("resources/icons/icon.ico")
+  expect(value.win?.target).toEqual([{ target: "portable", arch: ["x64"] }])
+})
+
 test("packages the verified CLI and skill outside the app archive", () => {
   expect(value.files).toContain("!resources/melange-qcom/**")
   expect(value.extraResources).toContainEqual({ from: "resources/melange-qcom", to: "melange-qcom" })

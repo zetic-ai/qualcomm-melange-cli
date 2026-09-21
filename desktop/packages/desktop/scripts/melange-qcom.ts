@@ -53,25 +53,56 @@ async function run(command: string, args: string[], cwd?: string) {
   return stdout.trim()
 }
 
-async function findBinary(directory: string): Promise<string> {
+type BuildTarget = {
+  filename: string
+  binary: string
+  archive: "tar.gz" | "zip"
+  architecture: RegExp
+}
+
+export function resolveBuildTarget(
+  version: string,
+  target = Bun.env.RUST_TARGET,
+  platform = process.platform,
+  arch = process.arch,
+): BuildTarget {
+  if (target === "x86_64-pc-windows-msvc") {
+    return {
+      filename: `melange-qcom_${version}_windows_amd64.zip`,
+      binary: "melange-qcom.exe",
+      archive: "zip",
+      architecture: /PE32\+ executable .*x86-64.*MS Windows/i,
+    }
+  }
+  if (target === "aarch64-apple-darwin" || (!target && platform === "darwin" && arch === "arm64")) {
+    return {
+      filename: `melange-qcom_${version}_darwin_arm64.tar.gz`,
+      binary: "melange-qcom",
+      archive: "tar.gz",
+      architecture: /arm64|Mach-O 64-bit.*arm64/i,
+    }
+  }
+  const build = target ?? `${platform}/${arch}`
+  throw new Error(`Melange Agent build target is not supported: ${build}`)
+}
+
+async function findBinary(directory: string, name: string): Promise<string> {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     const path = join(directory, entry.name)
     if (entry.isDirectory()) {
-      const nested = await findBinary(path).catch(() => "")
+      const nested = await findBinary(path, name).catch(() => "")
       if (nested) return nested
     }
-    if (entry.isFile() && entry.name === "melange-qcom") return path
+    if (entry.isFile() && entry.name === name) return path
   }
-  throw new Error("verified archive does not contain melange-qcom")
+  throw new Error(`verified archive does not contain ${name}`)
 }
 
 export async function prepareMelangeQcom() {
-  if (process.platform !== "darwin" || process.arch !== "arm64") {
-    throw new Error(`Melange Agent v1 builds only on macOS arm64, not ${process.platform} ${process.arch}`)
-  }
   const mirrorRoot = resolve(import.meta.dir, "../../../..")
   const { tag, version } = parsePinnedUpstream(await readFile(join(mirrorRoot, "UPSTREAM.json"), "utf8"))
-  const filename = `melange-qcom_${version}_darwin_arm64.tar.gz`
+  const target = resolveBuildTarget(version)
+  const filename = target.filename
   const release = `${MIRROR}/releases/download/${tag}`
   const scratch = await mkdtemp(join(tmpdir(), "melange-agent-build-"))
   try {
@@ -111,10 +142,11 @@ export async function prepareMelangeQcom() {
     const archivePath = join(scratch, filename)
     const extractDir = join(scratch, "extract")
     await Promise.all([writeFile(archivePath, archive), mkdir(extractDir)])
-    await run("tar", ["-xzf", archivePath, "-C", extractDir])
-    const sourceBinary = await findBinary(extractDir)
+    if (target.archive === "zip") await run("unzip", ["-q", archivePath, "-d", extractDir])
+    else await run("tar", ["-xzf", archivePath, "-C", extractDir])
+    const sourceBinary = await findBinary(extractDir, target.binary)
     const fileDescription = await run("file", [sourceBinary])
-    if (!/arm64|Mach-O 64-bit.*arm64/i.test(fileDescription)) {
+    if (!target.architecture.test(fileDescription)) {
       throw new Error(`verified CLI has the wrong architecture: ${fileDescription}`)
     }
 
@@ -122,19 +154,20 @@ export async function prepareMelangeQcom() {
     const packagedRoot = join(resources, "melange-qcom")
     await rm(packagedRoot, { recursive: true, force: true })
     await mkdir(join(packagedRoot, "bin"), { recursive: true })
-    const packagedBinary = join(packagedRoot, "bin", "melange-qcom")
+    const packagedBinary = join(packagedRoot, "bin", target.binary)
     await copyFile(sourceBinary, packagedBinary)
-    await chmod(packagedBinary, 0o755)
-    await run("codesign", ["--force", "--sign", "-", packagedBinary])
+    if (target.archive === "tar.gz") {
+      await chmod(packagedBinary, 0o755)
+      await run("codesign", ["--force", "--sign", "-", packagedBinary])
 
-    const launcherDir = join(packagedRoot, "launcher")
-    await mkdir(launcherDir)
-    const launcher = join(launcherDir, "melange-qcom")
-    await writeFile(
-      launcher,
-      `#!/bin/sh\nif [ "\${MELANGE_AGENT_XDG_STATE_HOME_SET:-0}" = 1 ]; then\n  export XDG_STATE_HOME="\${MELANGE_AGENT_XDG_STATE_HOME:-}"\nelse\n  unset XDG_STATE_HOME\nfi\nunset MELANGE_AGENT_XDG_STATE_HOME MELANGE_AGENT_XDG_STATE_HOME_SET\nif [ "$#" = 1 ] && [ "$1" = "--version" ]; then\n  set -- version\nfi\nexec "$(dirname "$0")/../bin/melange-qcom" "$@"\n`,
-      { mode: 0o755 },
-    )
+      const launcherDir = join(packagedRoot, "launcher")
+      await mkdir(launcherDir)
+      await writeFile(
+        join(launcherDir, "melange-qcom"),
+        `#!/bin/sh\nif [ "\${MELANGE_AGENT_XDG_STATE_HOME_SET:-0}" = 1 ]; then\n  export XDG_STATE_HOME="\${MELANGE_AGENT_XDG_STATE_HOME:-}"\nelse\n  unset XDG_STATE_HOME\nfi\nunset MELANGE_AGENT_XDG_STATE_HOME MELANGE_AGENT_XDG_STATE_HOME_SET\nif [ "$#" = 1 ] && [ "$1" = "--version" ]; then\n  set -- version\nfi\nexec "$(dirname "$0")/../bin/melange-qcom" "$@"\n`,
+        { mode: 0o755 },
+      )
+    }
     await cp(join(mirrorRoot, "skills", "melange-qcom"), join(packagedRoot, "skill", "melange-qcom"), {
       recursive: true,
     })
@@ -142,8 +175,10 @@ export async function prepareMelangeQcom() {
       join(packagedRoot, "VERIFIED.json"),
       `${JSON.stringify({ tag, filename: basename(cachedArchive), sha256: expected, signer: SIGNER }, null, 2)}\n`,
     )
-    const mode = (await stat(packagedBinary)).mode & 0o777
-    if ((mode & 0o111) === 0) throw new Error("packaged Qualcomm Melange CLI is not executable")
+    if (target.archive === "tar.gz") {
+      const mode = (await stat(packagedBinary)).mode & 0o777
+      if ((mode & 0o111) === 0) throw new Error("packaged Qualcomm Melange CLI is not executable")
+    }
   } finally {
     await rm(scratch, { recursive: true, force: true })
   }

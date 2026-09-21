@@ -38,6 +38,10 @@ const config: Configuration = {
       { target: "zip", arch: ["arm64"] },
     ],
   },
+  win: {
+    icon: "resources/icons/icon.ico",
+    target: [{ target: "portable", arch: ["x64"] }],
+  },
   dmg: { sign: false },
   protocols: {
     name: "Melange Agent",

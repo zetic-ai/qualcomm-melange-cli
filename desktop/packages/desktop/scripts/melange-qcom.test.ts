@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { checksumFor, parsePinnedUpstream, verifySHA256 } from "./melange-qcom"
+import { checksumFor, parsePinnedUpstream, resolveBuildTarget, verifySHA256 } from "./melange-qcom"
 
 describe("Qualcomm Melange release verification", () => {
   test("accepts only the pinned v0.10.0 upstream release", () => {
@@ -28,5 +28,21 @@ describe("Qualcomm Melange release verification", () => {
     const verifiedHash = "1c34f88707b55e6104c4eb20e71ffa3d33e414b71ef689a15fad0640d0ac58cb"
     expect(await verifySHA256(new TextEncoder().encode("verified"), verifiedHash)).toBeUndefined()
     await expect(verifySHA256(new TextEncoder().encode("tampered"), verifiedHash)).rejects.toThrow("checksum mismatch")
+  })
+
+  test("selects the Windows x64 release from an explicit Rust target", () => {
+    expect(resolveBuildTarget("0.10.0", "x86_64-pc-windows-msvc", "darwin", "arm64")).toMatchObject({
+      filename: "melange-qcom_0.10.0_windows_amd64.zip",
+      binary: "melange-qcom.exe",
+      archive: "zip",
+    })
+  })
+
+  test("keeps the native Apple Silicon release as the default", () => {
+    expect(resolveBuildTarget("0.10.0", undefined, "darwin", "arm64")).toMatchObject({
+      filename: "melange-qcom_0.10.0_darwin_arm64.tar.gz",
+      binary: "melange-qcom",
+      archive: "tar.gz",
+    })
   })
 })
