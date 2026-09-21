@@ -3,6 +3,19 @@ import type { Prompt } from "@/context/prompt"
 import { buildRequestParts } from "./build-request-parts"
 
 describe("buildRequestParts", () => {
+  test("button origin travels as synthetic metadata; identical typed text has no template", () => {
+    const text = "Build an on-device real time translation app"
+    const input = {
+      context: [], images: [], text, messageID: "msg_1", sessionID: "ses_1", sessionDirectory: "/repo",
+    }
+    const typed = buildRequestParts({ ...input, prompt: [{ type: "text", content: text, start: 0, end: text.length }] })
+    const button = buildRequestParts({ ...input, prompt: [{ type: "text", content: text, start: 0, end: text.length, demoApp: "translation" }] })
+    expect(typed.requestParts).toHaveLength(1)
+    expect(button.requestParts).toHaveLength(2)
+    expect(button.requestParts[0]).toMatchObject({ type: "text", text })
+    expect(button.requestParts[1]).toMatchObject({ synthetic: true, metadata: { melangeDemoApp: "translation" } })
+    expect(button.optimisticParts[1]).toMatchObject({ synthetic: true, metadata: { melangeDemoApp: "translation" } })
+  })
   test("builds typed request and optimistic parts without cast path", () => {
     const prompt: Prompt = [
       { type: "text", content: "hello", start: 0, end: 5 },

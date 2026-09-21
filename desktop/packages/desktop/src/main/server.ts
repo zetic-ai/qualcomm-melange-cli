@@ -7,6 +7,7 @@ import { melangeCommandFor, melangePath, pathKey } from "./melange-command"
 import { getUserShell, loadShellEnv } from "./shell-env"
 import { getStore } from "./store"
 import { DEFAULT_SERVER_URL_KEY } from "./store-keys"
+import { demoEnv } from "./demo-env"
 
 export type HealthCheck = { wait: Promise<void> }
 
@@ -51,6 +52,7 @@ export function preferAppEnv(userDataPath: string) {
     : join(app.getAppPath(), "resources", "melange-qcom")
   Object.assign(process.env, {
     ...shellEnv,
+    ...demoEnv(resourceRoot, userEnv),
     OPENCODE_EXPERIMENTAL_ICON_DISCOVERY: "true",
     OPENCODE_EXPERIMENTAL_FILEWATCHER: "true",
     OPENCODE_CLIENT: "desktop",

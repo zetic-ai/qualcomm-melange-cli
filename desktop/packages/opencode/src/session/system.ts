@@ -54,6 +54,14 @@ status. Do not use private models or repositories, and do not substitute a gener
 when the Melange workflow applies.
 
 MANDATORY MODEL SELECTION: For an AI app request, first call 'melange_prepare_model' without
+arguments. The tool routes translation, image/vision, and home-appliance requests to the
+assigned model based on the request text, whether typed or started with a button.
+For a matched request, the tool checks the assigned model's actual library
+entry and ready state. Briefly explain its suitability from verified information, then call
+the tool again with that model as the sole candidate to show its benchmark. Do not open a
+chooser, add a Recommended label, claim to have compared alternatives, or discuss internal
+template configuration unprompted. If unavailable, report the blocker instead of substituting.
+For unmatched or mixed-purpose requests, first call 'melange_prepare_model' without
 arguments to discover the public library. Compare the catalog against the user's task and
 call it again with four suitable candidates (full model IDs and concise strengths/tradeoffs),
 exactly one 'recommended' ID, and a selection question in the user's language. Include the
@@ -63,6 +71,18 @@ The tool opens a model chooser and WAITS for the user's answer. Recommended is a
 not consent. Do not choose a model, edit app files, or start implementation before this tool
 returns a user-confirmed model. If the user dismisses the chooser, wait for their choice.
 After selection, the tool card automatically shows the benchmark chart and table exactly once.
+For changgeun/LFM2.5-VL-450M, the tool uses FP16 CLI measurements and merges the supplied
+SM8975 measurement (25.41 TPS); do not relabel it as Q4 or claim the supplied value came
+from the CLI. The separate SM8975 - ZETIC Optimized entry is supplied Decode TPS 65.42,
+not a replacement for 25.41 TPS. Its detail table contains TTFT 0.331 s, Prefill TPS 3150,
+Decode TPS 65.42 and Vision only 45 ms. Tables below graphs are for SM8975 only,
+not a repetition of the per-chip graph values. Do not invent missing details for other models.
+The tool also renders a separate supplied Q4 Decode TPS chart for this model:
+SM8250 30.93, SM8550 94.49, SM8650 84.43, SM8750 137.12, SM8850 158.40,
+SM8975 180.20 tokens/s. Keep this series separate from FP16; never merge the values.
+Do not claim these supplied optimization measurements came
+from the CLI. All other models use Q4 q4_k_m. A CLI report error must be reported, not
+treated as an empty successful report or replaced with invented benchmark data.
 Do not repeat either in commentary or the final answer. Proceed directly with
 target selection and implementation using only the user's chosen model. This tool is the
 approved discovery and selection path; do not bypass the chooser with shell commands.
@@ -73,7 +93,14 @@ as a direct child of <manifest>, outside <application>, in app/src/main/AndroidM
 This is required even for on-device apps because Melange initialization and model downloads
 need network access. Before building, inspect the manifest and add the permission if missing;
 preserve any existing permissions and avoid duplicate declarations.
-Inspect
+If MELANGE_DEMO_MODE is 1, authentication and the Gradle MELANGE_API_KEY project property
+are already supplied by the desktop environment. Use providers.gradleProperty("MELANGE_API_KEY")
+in generated Android build scripts to configure the SDK key. Do not ask the user for a key,
+print environment variables, read/display the credential file, or put a literal token in source.
+Pass the configured property to the app's SDK initialization (for example through BuildConfig).
+Keep this environment inherited by Gradle and Melange CLI subprocesses.
+
+For Android app requests, inspect
 the project's Gradle wrapper and JDK; if the wrapper is missing, set up a compatible
 Gradle wrapper and attempt assembleDebug. Do not stop merely because global gradle is absent.
 Report an APK path only after successful assembly. Clearly distinguish a compiler/build
@@ -109,7 +136,7 @@ function providerPrompt(model: Provider.Model) {
 }
 
 export function provider(model: Provider.Model) {
-  return [...providerPrompt(model), MELANGE_CONTEXT]
+  return [...providerPrompt(model), MELANGE_CONTEXT, ...(process.env.MELANGE_DEMO_MODE === "1" ? ["Demo mode is active. Melange CLI authentication and the Gradle MELANGE_API_KEY property are preconfigured. Use them without asking for or displaying credentials."] : [])]
 }
 
 export interface Interface {

@@ -14,7 +14,7 @@ import { normalizePromptHistoryEntry, promptLength, type PromptHistoryComment } 
 import { createPersistedPromptInputHistory } from "@/components/prompt-input/history-store"
 import { promptDesignPlaceholder, promptPlaceholder } from "@/components/prompt-input/placeholder"
 import { createPromptSubmit } from "@/components/prompt-input/submit"
-import { DemoPrompts } from "./demo-prompts"
+import { DemoPrompts, type DemoApp } from "./demo-prompts"
 import { selectionFromLines, type SelectedLineRange, useFile } from "@/context/file"
 import { useComments } from "@/context/comments"
 import { useCommand } from "@/context/command"
@@ -45,7 +45,7 @@ export type PromptInputV2ComposerController = PromptInputV2Interaction & {
   readonly model: PromptInputProps["controls"]["model"]
   readonly demoDisabled: boolean
   readonly demoHidden: boolean
-  sendDemo: (text: string) => void
+  sendDemo: (text: string, demo: DemoApp) => void
 }
 
 export function PromptInputV2Composer(props: PromptInputV2ComposerProps) {
@@ -428,9 +428,9 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
       prompt.current().some((part) => part.type !== "text" || part.content.trim().length > 0),
   })
   Object.defineProperty(controller, "sendDemo", {
-    value: (text: string) => {
+    value: (text: string, demo: DemoApp) => {
       controller.dispatch({ type: "mode.normal" })
-      prompt.set([{ type: "text", content: text, start: 0, end: text.length }], text.length)
+      prompt.set([{ type: "text", content: text, start: 0, end: text.length, demoApp: demo }], text.length)
       void submission.handleSubmit(new Event("submit"))
     },
   })

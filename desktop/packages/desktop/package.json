@@ -9,6 +9,7 @@
     "name": "ZETIC.ai"
   },
   "scripts": {
+    "build:demo": "bun ./scripts/build-demo.ts",
     "typecheck": "tsgo -b",
     "predev": "bun ./scripts/predev.ts",
     "dev": "electron-vite dev",
