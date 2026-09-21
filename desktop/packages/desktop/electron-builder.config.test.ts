@@ -55,6 +55,6 @@ test("refuses to package a bundle built for another platform", async () => {
 })
 
 test("disables 7-Zip branch filters for Windows payloads so NSIS can extract Arm64 executables", () => {
-  expect(sevenZipFilterFor("win32")).toBe("off")
+  expect(sevenZipFilterFor("win32")).toBe("BCJ2")
   expect(sevenZipFilterFor("darwin")).toBeUndefined()
 })

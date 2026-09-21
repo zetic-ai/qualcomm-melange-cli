@@ -20,11 +20,12 @@ export function foreignNativePackages(key: string) {
  * The 7-Zip that electron-builder downloads (24.x) applies its ARM64 branch
  * filter to Arm64 PE files, but the NSIS extraction plugin uses an old 7-Zip
  * decoder that does not know that filter: the installer then finishes with
- * exit code 0 and silently omits every .exe and .dll. Disable branch filters
- * for Windows payloads (costs a few MB of compression, nothing else).
+ * exit code 0 and silently omits every .exe and .dll. Force the classic BCJ2
+ * filter (electron-builder only accepts named filters here) for Windows
+ * payloads; the plugin decodes it, and it costs a few MB of compression at most.
  */
 export function sevenZipFilterFor(os: string) {
-  return os === "win32" ? "off" : undefined
+  return os === "win32" ? "BCJ2" : undefined
 }
 
 if (sevenZipFilterFor(target.os) && !process.env.ELECTRON_BUILDER_7Z_FILTER) {
