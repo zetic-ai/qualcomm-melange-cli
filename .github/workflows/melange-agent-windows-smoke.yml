@@ -142,13 +142,18 @@ jobs:
           $app = Join-Path $env:LOCALAPPDATA 'Programs\melange-agent\Melange Agent.exe'
           $proc = Start-Process -FilePath $app -PassThru
           "started pid $($proc.Id)"
-          $log = Join-Path $env:APPDATA 'Melange Agent\logs\main.log'
+          # userData is %APPDATA%\ai.zetic.melange-agent (src/main/index.ts) and electron-log
+          # writes <userData>\logs\<run stamp>\main.log (src/main/logging.ts).
+          $logRoot = Join-Path $env:APPDATA 'ai.zetic.melange-agent\logs'
           $deadline = (Get-Date).AddSeconds(180)
           $ok = $false
+          $log = $null
           while ((Get-Date) -lt $deadline) {
             Start-Sleep -Seconds 5
-            if (Test-Path $log) {
-              $text = Get-Content $log -Raw
+            $log = Get-ChildItem -Path $logRoot -Filter main.log -Recurse -ErrorAction SilentlyContinue |
+              Sort-Object LastWriteTime | Select-Object -Last 1
+            if ($log) {
+              $text = Get-Content $log.FullName -Raw
               if ($text -match 'loading task finished') { $ok = $true; break }
               if ($text -match 'Uncaught Exception|initialization failed|sidecar exited before') { break }
             }
@@ -159,7 +164,7 @@ jobs:
             Select-Object Id, ProcessName, MainWindowTitle | Format-Table -AutoSize
           $errorDialog = Get-Process | Where-Object { $_.ProcessName -like 'Melange*' -and $_.MainWindowTitle -eq 'Error' }
           "--- main.log ---"
-          if (Test-Path $log) { Get-Content $log -Tail 80 } else { "no main.log at $log"; Get-ChildItem $env:APPDATA -Directory | Select-Object Name }
+          if ($log) { "at $($log.FullName)"; Get-Content $log.FullName -Tail 80 } else { "no main.log under $logRoot"; Get-ChildItem (Split-Path $logRoot) -Recurse -ErrorAction SilentlyContinue | Select-Object FullName }
           New-Item -ItemType Directory -Force -Path artifacts | Out-Null
           Add-Type -AssemblyName System.Windows.Forms, System.Drawing
           $b = [System.Windows.Forms.SystemInformation]::VirtualScreen
@@ -167,7 +172,7 @@ jobs:
           $g = [System.Drawing.Graphics]::FromImage($bmp)
           $g.CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
           $bmp.Save('artifacts\screen.png')
-          if (Test-Path (Join-Path $env:APPDATA 'Melange Agent\logs')) { Copy-Item (Join-Path $env:APPDATA 'Melange Agent\logs') artifacts\logs -Recurse }
+          if (Test-Path $logRoot) { Copy-Item $logRoot artifacts\logs -Recurse }
           Get-Process | Where-Object { $_.ProcessName -like 'Melange*' } | Stop-Process -Force -ErrorAction SilentlyContinue
           if ($errorDialog) { "main process error dialog is showing"; exit 1 }
           if (-not $ok) { "app never logged 'loading task finished'"; exit 1 }
