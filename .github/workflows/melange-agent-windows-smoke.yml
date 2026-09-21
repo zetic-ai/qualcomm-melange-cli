@@ -1,0 +1,153 @@
+name: Melange Agent Windows on Arm smoke test
+
+# Builds the Windows on Arm installer the same way a developer does on an
+# Apple Silicon Mac (bun run dist:win), then installs and launches it on a
+# GitHub-hosted Windows 11 Arm64 runner and checks that the app reaches the
+# "loading task finished" state instead of dying in the main process.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["smoke/**"]
+    paths:
+      - "desktop/packages/desktop/**"
+      - ".github/workflows/melange-agent-windows-smoke.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: melange-agent-windows-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Cross-build installer on macOS arm64
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+
+      - uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: v3.1.2
+
+      - name: Install dependencies
+        working-directory: desktop
+        run: bun install --frozen-lockfile
+
+      - name: Build and package (win32-arm64)
+        working-directory: desktop/packages/desktop
+        env:
+          OPENCODE_CHANNEL: prod
+        run: bun run dist:win
+
+      - name: Record what was packaged
+        working-directory: desktop/packages/desktop
+        run: |
+          cat out/main/build-target.json
+          cat resources/melange-qcom/VERIFIED.json
+          ls -la dist/*.exe
+          shasum -a 256 dist/melange-agent-win-arm64.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: melange-agent-win-arm64
+          path: desktop/packages/desktop/dist/melange-agent-win-arm64.exe
+          if-no-files-found: error
+          retention-days: 7
+
+  smoke:
+    name: Install and launch on Windows 11 Arm64
+    needs: build
+    runs-on: windows-11-arm
+    timeout-minutes: 30
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: melange-agent-win-arm64
+          path: installer
+
+      - name: Host facts
+        shell: pwsh
+        run: |
+          $os = Get-CimInstance Win32_OperatingSystem
+          "OS: $($os.Caption) $($os.Version) arch=$env:PROCESSOR_ARCHITECTURE"
+          "CPU: $((Get-CimInstance Win32_Processor).Name)"
+          Get-Item installer\*.exe | Format-List Name, Length
+
+      - name: Silent install
+        shell: pwsh
+        run: |
+          $setup = (Get-Item installer\melange-agent-win-arm64.exe).FullName
+          $p = Start-Process -FilePath $setup -ArgumentList '/S' -PassThru -Wait
+          "installer exit code: $($p.ExitCode)"
+          $app = Join-Path $env:LOCALAPPDATA 'Programs\Melange Agent\Melange Agent.exe'
+          if (-not (Test-Path $app)) {
+            "Melange Agent.exe not found; contents of Programs:"
+            Get-ChildItem (Join-Path $env:LOCALAPPDATA 'Programs') -Recurse -Depth 1 | Select-Object FullName
+            exit 1
+          }
+          "installed: $app"
+          Get-ChildItem (Join-Path $env:LOCALAPPDATA 'Programs\Melange Agent\resources') | Select-Object Name, Length
+
+      - name: Bundled Qualcomm CLI runs through the launcher
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:LOCALAPPDATA 'Programs\Melange Agent\resources\melange-qcom'
+          Get-Content (Join-Path $root 'VERIFIED.json')
+          $launcher = Join-Path $root 'launcher\melange-qcom.cmd'
+          $out = & cmd.exe /c "`"$launcher`" --version" 2>&1
+          "launcher --version -> [$LASTEXITCODE] $out"
+          if ($LASTEXITCODE -ne 0 -or "$out" -notmatch 'melange-qcom version 0\.10\.0') { exit 1 }
+          $exe = Join-Path $root 'bin\melange-qcom.exe'
+          $status = & $exe auth status --json 2>&1
+          "auth status -> [$LASTEXITCODE] $status"
+
+      - name: Launch the app and wait for the main process to finish loading
+        shell: pwsh
+        run: |
+          $app = Join-Path $env:LOCALAPPDATA 'Programs\Melange Agent\Melange Agent.exe'
+          $proc = Start-Process -FilePath $app -PassThru
+          "started pid $($proc.Id)"
+          $log = Join-Path $env:APPDATA 'Melange Agent\logs\main.log'
+          $deadline = (Get-Date).AddSeconds(180)
+          $ok = $false
+          while ((Get-Date) -lt $deadline) {
+            Start-Sleep -Seconds 5
+            if (Test-Path $log) {
+              $text = Get-Content $log -Raw
+              if ($text -match 'loading task finished') { $ok = $true; break }
+              if ($text -match 'Uncaught Exception|initialization failed|sidecar exited before') { break }
+            }
+            if ($proc.HasExited) { "process exited early with code $($proc.ExitCode)"; break }
+          }
+          "--- windows owned by Melange Agent processes ---"
+          Get-Process | Where-Object { $_.ProcessName -like 'Melange*' } |
+            Select-Object Id, ProcessName, MainWindowTitle | Format-Table -AutoSize
+          $errorDialog = Get-Process | Where-Object { $_.ProcessName -like 'Melange*' -and $_.MainWindowTitle -eq 'Error' }
+          "--- main.log ---"
+          if (Test-Path $log) { Get-Content $log -Tail 80 } else { "no main.log at $log"; Get-ChildItem $env:APPDATA -Directory | Select-Object Name }
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          $b = [System.Windows.Forms.SystemInformation]::VirtualScreen
+          $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+          $g = [System.Drawing.Graphics]::FromImage($bmp)
+          $g.CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+          $bmp.Save('artifacts\screen.png')
+          if (Test-Path (Join-Path $env:APPDATA 'Melange Agent\logs')) { Copy-Item (Join-Path $env:APPDATA 'Melange Agent\logs') artifacts\logs -Recurse }
+          Get-Process | Where-Object { $_.ProcessName -like 'Melange*' } | Stop-Process -Force -ErrorAction SilentlyContinue
+          if ($errorDialog) { "main process error dialog is showing"; exit 1 }
+          if (-not $ok) { "app never logged 'loading task finished'"; exit 1 }
+          "OK: main process finished loading on Windows on Arm"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-arm64-smoke-evidence
+          path: artifacts
+          if-no-files-found: warn
