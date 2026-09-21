@@ -92,19 +92,19 @@ jobs:
           $setup = (Get-Item installer\melange-agent-win-arm64.exe).FullName
           $p = Start-Process -FilePath $setup -ArgumentList '/S' -PassThru -Wait
           "installer exit code: $($p.ExitCode)"
-          $app = Join-Path $env:LOCALAPPDATA 'Programs\Melange Agent\Melange Agent.exe'
+          $app = Join-Path $env:LOCALAPPDATA 'Programs\melange-agent\Melange Agent.exe'
           if (-not (Test-Path $app)) {
             "Melange Agent.exe not found; contents of Programs:"
             Get-ChildItem (Join-Path $env:LOCALAPPDATA 'Programs') -Recurse -Depth 1 | Select-Object FullName
             exit 1
           }
           "installed: $app"
-          Get-ChildItem (Join-Path $env:LOCALAPPDATA 'Programs\Melange Agent\resources') | Select-Object Name, Length
+          Get-ChildItem (Join-Path $env:LOCALAPPDATA 'Programs\melange-agent\resources') | Select-Object Name, Length
 
       - name: Bundled Qualcomm CLI runs through the launcher
         shell: pwsh
         run: |
-          $root = Join-Path $env:LOCALAPPDATA 'Programs\Melange Agent\resources\melange-qcom'
+          $root = Join-Path $env:LOCALAPPDATA 'Programs\melange-agent\resources\melange-qcom'
           Get-Content (Join-Path $root 'VERIFIED.json')
           $launcher = Join-Path $root 'launcher\melange-qcom.cmd'
           $out = & cmd.exe /c "`"$launcher`" --version" 2>&1
@@ -117,7 +117,7 @@ jobs:
       - name: Launch the app and wait for the main process to finish loading
         shell: pwsh
         run: |
-          $app = Join-Path $env:LOCALAPPDATA 'Programs\Melange Agent\Melange Agent.exe'
+          $app = Join-Path $env:LOCALAPPDATA 'Programs\melange-agent\Melange Agent.exe'
           $proc = Start-Process -FilePath $app -PassThru
           "started pid $($proc.Id)"
           $log = Join-Path $env:APPDATA 'Melange Agent\logs\main.log'

@@ -46,6 +46,9 @@ export function packagingGuard(read: (file: string) => Promise<Recorded>) {
 const config: Configuration = {
   appId: "ai.zetic.melange-agent",
   productName: "Melange Agent",
+  // electron-builder names the NSIS install directory (%LOCALAPPDATA%\Programs\<name>)
+  // after the package name, which would otherwise be "@opencode-aidesktop".
+  extraMetadata: { name: "melange-agent" },
   artifactName: "melange-agent-${os}-${arch}.${ext}",
   directories: {
     output: "dist",

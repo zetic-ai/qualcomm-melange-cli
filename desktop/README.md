@@ -81,7 +81,7 @@ packages/desktop/dist/melange-agent-win-x64.exe
 ```
 
 The installer is a per-user NSIS one-click setup that installs to
-`%LOCALAPPDATA%\Programs\Melange Agent`. It is unsigned, so SmartScreen shows
+`%LOCALAPPDATA%\Programs\melange-agent`. It is unsigned, so SmartScreen shows
 "Windows protected your PC" on first launch; choose **More info** and
 **Run anyway**.
 
@@ -137,7 +137,7 @@ Verify the bundled Qualcomm CLI without signing in:
 On Windows, after installing:
 
 ```powershell
-& "$env:LOCALAPPDATA\Programs\Melange Agent\resources\melange-qcom\launcher\melange-qcom.cmd" --version
+& "$env:LOCALAPPDATA\Programs\melange-agent\resources\melange-qcom\launcher\melange-qcom.cmd" --version
 ```
 
 ## macOS security notice

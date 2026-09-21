@@ -18,6 +18,7 @@ test("packages a stable unsigned Apple Silicon Melange Agent", () => {
 })
 
 test("packages an unsigned Windows on Arm installer by default", () => {
+  expect(value.extraMetadata).toEqual({ name: "melange-agent" })
   expect(value.win?.icon).toBe("resources/icons/icon.ico")
   expect(value.win?.target).toEqual([{ target: "nsis", arch: ["arm64"] }])
   expect(value.win?.verifyUpdateCodeSignature).toBe(false)
