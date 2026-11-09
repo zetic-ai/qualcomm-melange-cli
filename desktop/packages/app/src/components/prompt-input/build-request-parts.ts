@@ -99,6 +99,17 @@ export function buildRequestParts(input: BuildRequestPartsInput) {
       ]
     : []
 
+  const demo = input.prompt.find((part) => part.type === "text" && part.demoApp)
+  if (demo?.type === "text" && demo.demoApp) {
+    requestParts.push({
+      id: Identifier.ascending("part"),
+      type: "text",
+      synthetic: true,
+      metadata: { melangeDemoApp: demo.demoApp },
+      text: "This request was started with an app template. Call melange_prepare_model without arguments to verify its model. Follow the tool's next step; explain the verified model's suitability before preparing its benchmark. Do not claim to have compared models.",
+    })
+  }
+
   const files = input.prompt.filter(isFileAttachment).map((attachment) => {
     const path = absolute(input.sessionDirectory, attachment.path)
     const source = attachment.source

@@ -667,43 +667,58 @@ function updateBenchmarkChart(
     return
   }
 
+  const optimized = data.points.find((point) => point.label === "SM8975 - ZETIC Optimized")
+  const featured = optimized ?? data.points.find((point) => point.label.toUpperCase() === "SM8975")
+  const isOptimized = data.points.some((point) => point.accelerator?.includes("ZETIC Optimized"))
   const width = 760
-  const height = 340
+  const height = featured ? 382 : 340
   const left = 76
-  const right = 42
+  const right = optimized ? 64 : 42
   const top = 42
-  const bottom = 92
+  const bottom = 104
   const labels = [...new Set(data.points.map((point) => point.label))]
   const groups = [...new Set(data.points.map((point) => point.accelerator ?? "default"))]
   const colors = ["#1d9b8a", "#111111", "#5374d8", "#8f8f8f"]
-  const max = Math.max(...data.points.map((point) => point.value), 1)
+  const peak = Math.max(...data.points.map((point) => point.value), 1)
+  const magnitude = 10 ** Math.floor(Math.log10(peak / 4))
+  const step = [1, 2, 5, 10].find((value) => value * magnitude >= peak / 4)! * magnitude
+  const max = Math.ceil(peak / step) * step
   const x = (label: string) => left + (labels.indexOf(label) / Math.max(labels.length - 1, 1)) * (width - left - right)
   const y = (value: number) => top + (1 - value / max) * (height - top - bottom)
   const esc = (value: string) =>
     value.replace(/[&<>\"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[char]!)
   const svg = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(data.title)}: ${esc(data.metric)} in ${esc(data.unit)}" style="display:block;width:100%;min-width:620px;height:auto">${Array.from(
-    { length: 5 },
+    { length: Math.round(max / step) + 1 },
     (_, index) => {
-      const value = (max * index) / 4
+      const value = step * index
       const yy = y(value)
-      return `<line x1="${left}" x2="${width - right}" y1="${yy}" y2="${yy}" stroke="#e5e5e5" stroke-dasharray="4 6"/><text x="${left - 10}" y="${yy + 5}" text-anchor="end" fill="#666" font-size="12">${value.toFixed(1)}</text>`
+      return `<line x1="${left}" x2="${width - right}" y1="${yy}" y2="${yy}" stroke="#e5e5e5" stroke-dasharray="4 6"/><text x="${left - 10}" y="${yy + 5}" text-anchor="end" fill="#666" font-size="12">${Number(value.toPrecision(3))}</text>`
     },
   ).join(
     "",
-  )}<text x="${left}" y="16" fill="#444" font-size="13">${esc(data.metric === "throughput" ? "TPS" : data.metric)} (${esc(data.unit)})</text><text x="${(left + width - right) / 2}" y="${height - 6}" text-anchor="middle" fill="#444" font-size="13">${labels.every((label) => /^SM\d+/i.test(label)) ? "Snapdragon SoC" : "Device / SoC"}</text><line x1="${left}" x2="${left}" y1="${top}" y2="${height - bottom}" stroke="#aaa"/><line x1="${left}" x2="${width - right}" y1="${height - bottom}" y2="${height - bottom}" stroke="#aaa"/>${labels.map((label) => `<text x="${x(label)}" y="${height - bottom + 30}" text-anchor="middle" fill="#444" font-size="12" transform="rotate(-28 ${x(label)} ${height - bottom + 30})">${esc(label)}</text>`).join("")}${groups
+  )}<text x="${left}" y="16" fill="#444" font-size="13">${esc(data.metric === "throughput" ? "TPS" : data.metric)} (${esc(data.unit)})</text><text x="${(left + width - right) / 2}" y="${height - 6}" text-anchor="middle" fill="#444" font-size="13">${labels.every((label) => /^SM\d+/i.test(label)) ? "Snapdragon SoC" : "Device / SoC"}</text><line x1="${left}" x2="${left}" y1="${top}" y2="${height - bottom}" stroke="#aaa"/><line x1="${left}" x2="${width - right}" y1="${height - bottom}" y2="${height - bottom}" stroke="#aaa"/>${labels.map((label) => {
+    const chip = /^SM8975(?:\s|$)/i.test(label)
+    const xx = x(label)
+    const yy = height - bottom
+    return chip
+      ? `<text x="${xx}" y="${yy + 25}" text-anchor="middle" fill="#147d70" font-size="12" font-weight="700">SM8975</text><rect x="${xx - 34}" y="${yy + 35}" width="68" height="19" rx="9" fill="#e7f5f2"/><text x="${xx}" y="${yy + 48}" text-anchor="middle" fill="#147d70" font-size="9" font-weight="700">NEW CHIP</text>${label === optimized?.label ? `<text x="${xx + 24}" y="${yy + 72}" text-anchor="end" fill="#147d70" font-size="11" font-weight="700">ZETIC Optimized</text>` : ""}`
+      : `<text x="${xx}" y="${yy + 30}" text-anchor="middle" fill="#444" font-size="12" transform="rotate(-28 ${xx} ${yy + 30})">${esc(label)}</text>`
+  }).join("")}${groups
     .map((group, groupIndex) => {
       const points = data.points.filter((point) => (point.accelerator ?? "default") === group)
-      const color = colors[groupIndex % colors.length]
+      const color = featured ? "#91cec5" : colors[groupIndex % colors.length]
       const path = points.map((point, index) => `${index ? "L" : "M"}${x(point.label)} ${y(point.value)}`).join(" ")
-      return `<path d="${path}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round"/>${points.map((point) => `<circle cx="${x(point.label)}" cy="${y(point.value)}" r="5" fill="${color}"/><text x="${x(point.label)}" y="${y(point.value) - 12}" text-anchor="middle" fill="#111" font-size="12" font-weight="600">${point.value.toFixed(2)}</text>`).join("")}`
+      return `<path d="${path}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round"/>${points.map((point) => /^SM8975(?:\s|$)/i.test(point.label)
+        ? `<g data-benchmark-featured=""><circle cx="${x(point.label)}" cy="${y(point.value)}" r="18" fill="#1d9b8a" fill-opacity="0.15"/><circle cx="${x(point.label)}" cy="${y(point.value)}" r="9" fill="#1d9b8a" stroke="#fff" stroke-width="3"/><text x="${x(point.label) + 12}" y="${y(point.value) - 26}" text-anchor="end" fill="#147d70" font-size="16" font-weight="750">${point.value.toFixed(2)} ${esc(point === optimized ? "Decode TPS" : data.metric === "throughput" ? "TPS" : data.metric)}</text></g>`
+        : `<circle cx="${x(point.label)}" cy="${y(point.value)}" r="5" fill="${color}"/><text x="${x(point.label) + (point.label === labels[0] ? 8 : 0)}" y="${y(point.value) - 12}" text-anchor="${point.label === labels[0] ? "start" : "middle"}" fill="#555" font-size="12" font-weight="600">${point.value.toFixed(2)}</text>`).join("")}`
     })
-    .join("")}</svg>`
+    .join("")}${optimized && data.points.some((point) => point.label === "SM8975") ? `<path d="M${x("SM8975")} ${y(data.points.find((point) => point.label === "SM8975")!.value)} L${x(optimized.label)} ${y(optimized.value)}" fill="none" stroke="#147d70" stroke-width="2" stroke-dasharray="4 6"/>` : ""}</svg>`
   const next = document.createElement("div")
   next.dataset.markdownBlock = ""
   next.dataset.markdownKey = block.key
   next.dataset.markdownHash = block.hash
   next.style.cssText = "background:#fff;border-radius:16px;padding:24px;color:#222;overflow:auto"
-  next.innerHTML = `<h3 style="margin:0 0 18px;font-size:20px">${esc(data.title)}</h3>${svg}<div style="display:flex;gap:18px;margin-top:8px;font-size:13px;color:#555">${groups.map((group, index) => `<span style="color:${colors[index % colors.length]}">● ${esc(group)}</span>`).join("")}</div>`
+  next.innerHTML = `<h3 style="margin:0 0 18px;font-size:20px">${esc(data.title)}</h3>${featured ? `<div data-benchmark-summary="" style="display:inline-flex;flex-wrap:wrap;align-items:center;gap:10px;margin:0 0 16px;padding:10px 16px;border-radius:12px;background:#e7f5f2;color:#147d70;font-size:16px;font-weight:700">${isOptimized ? `<span style="border:1px solid #1d9b8a;border-radius:6px;padding:2px 7px;font-size:12px">ZETIC Optimized</span>` : ""}${esc(optimized ? "SM8975" : featured.label)} · ${featured.value.toFixed(2)} ${esc(featured === optimized ? "Decode TPS" : data.metric === "throughput" ? "TPS" : data.metric)}</div>` : ""}${svg}<div style="display:flex;gap:18px;margin-top:8px;font-size:13px;color:#555">${groups.map((group, index) => `<span style="color:${group === optimized?.accelerator ? "#147d70" : colors[index % colors.length]}">● ${esc(group)}</span>`).join("")}</div>`
   if (current) container.replaceChild(next, current)
   else container.appendChild(next)
 }

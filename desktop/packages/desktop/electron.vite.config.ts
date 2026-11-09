@@ -3,6 +3,8 @@ import { defineConfig } from "electron-vite"
 import appPlugin from "@opencode-ai/app/vite"
 import * as fs from "node:fs/promises"
 
+import { BUILD_TARGET_FILE, resolveTarget } from "./scripts/target"
+
 const OPENCODE_SERVER_DIST = "../opencode/dist/node"
 
 const channel = (() => {
@@ -12,7 +14,10 @@ const channel = (() => {
   return "dev"
 })()
 
-const nodePtyPkg = `@lydell/node-pty-${process.platform}-${process.arch}`
+// The node-pty platform package must match the *target*, not the build host.
+// Cross-builds set MELANGE_TARGET_OS / MELANGE_TARGET_ARCH (see scripts/target.ts).
+const target = resolveTarget()
+const nodePtyPkg = target.nodePty
 
 const sentry =
   process.env.SENTRY_AUTH_TOKEN && process.env.SENTRY_ORG && process.env.SENTRY_PROJECT
@@ -75,6 +80,14 @@ const require = __cjs_mod__.createRequire(import.meta.url);
             if (!l.endsWith(".wasm")) continue
             await fs.writeFile(`./out/main/chunks/${l}`, await fs.readFile(`${OPENCODE_SERVER_DIST}/${l}`))
           }
+        },
+      },
+      {
+        name: "opencode:record-build-target",
+        async writeBundle() {
+          // electron-builder refuses to package this output for a different platform.
+          const record = { os: target.os, arch: target.arch, nodePty: nodePtyPkg }
+          await fs.writeFile(BUILD_TARGET_FILE, `${JSON.stringify(record, null, 2)}\n`)
         },
       },
     ],

@@ -8,10 +8,39 @@ import { Flag } from "./flag/flag"
 import { makeGlobalNode } from "./effect/app-node"
 
 const app = "opencode"
-const data = path.join(xdgData!, app)
-const cache = path.join(xdgCache!, app)
-const config = path.join(xdgConfig!, app)
-const state = path.join(xdgState!, app)
+
+export type StorageDirs = { data: string; cache: string; config: string; state: string }
+
+/**
+ * Where OpenCode keeps its files. By default the XDG base directories, shared
+ * with any other OpenCode installation on the machine. When OPENCODE_STORAGE_ROOT
+ * is set (Melange Agent sets it to its own user-data directory) everything lives
+ * under that root, so a newer or older OpenCode's database, config, auth and
+ * cache on the same machine are never opened.
+ */
+export function storageDirs(root: string | undefined, xdg: StorageDirs): StorageDirs {
+  if (root) {
+    return {
+      data: path.join(root, "data"),
+      cache: path.join(root, "cache"),
+      config: path.join(root, "config"),
+      state: path.join(root, "state"),
+    }
+  }
+  return {
+    data: path.join(xdg.data, app),
+    cache: path.join(xdg.cache, app),
+    config: path.join(xdg.config, app),
+    state: path.join(xdg.state, app),
+  }
+}
+
+const { data, cache, config, state } = storageDirs(Flag.OPENCODE_STORAGE_ROOT, {
+  data: xdgData!,
+  cache: xdgCache!,
+  config: xdgConfig!,
+  state: xdgState!,
+})
 const tmp = path.join(os.tmpdir(), app)
 
 const paths = {

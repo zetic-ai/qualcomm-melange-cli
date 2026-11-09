@@ -1443,9 +1443,9 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
           working() ||
           prompt.current().some((part) => part.type !== "text" || part.content.trim().length > 0)
         }
-        onSend={(text) => {
+        onSend={(text, demo) => {
           setStore("mode", "normal")
-          prompt.set([{ type: "text", content: text, start: 0, end: text.length }], text.length)
+          prompt.set([{ type: "text", content: text, start: 0, end: text.length, demoApp: demo }], text.length)
           void handleSubmit(new Event("submit"))
         }}
       />

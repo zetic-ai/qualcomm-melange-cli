@@ -2,7 +2,9 @@ import { For, Show } from "solid-js"
 import { useLanguage } from "@/context/language"
 import "./demo-prompts.css"
 
-export function DemoPrompts(props: { disabled: boolean; hidden?: boolean; onSend: (text: string) => void }) {
+export type DemoApp = "translation" | "image" | "appliance"
+
+export function DemoPrompts(props: { disabled: boolean; hidden?: boolean; onSend: (text: string, demo: DemoApp) => void }) {
   const language = useLanguage()
   const options = ["translation", "image", "appliance"] as const
   return (
@@ -14,7 +16,7 @@ export function DemoPrompts(props: { disabled: boolean; hidden?: boolean; onSend
               type="button"
               data-demo={option}
               disabled={props.disabled}
-              onClick={() => props.onSend(language.t(`prompt.demo.${option}.prompt`))}
+              onClick={() => props.onSend(language.t(`prompt.demo.${option}.prompt`), option)}
             >
               <span data-slot="demo-icon" aria-hidden="true">
                 <svg

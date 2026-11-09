@@ -9,6 +9,7 @@
     "name": "ZETIC.ai"
   },
   "scripts": {
+    "build:demo": "bun ./scripts/build-demo.ts",
     "typecheck": "tsgo -b",
     "predev": "bun ./scripts/predev.ts",
     "dev": "electron-vite dev",
@@ -19,6 +20,8 @@
     "package:mac": "electron-builder --mac --config electron-builder.config.ts",
     "package:win": "electron-builder --win --config electron-builder.config.ts",
     "package:linux": "electron-builder --linux --config electron-builder.config.ts",
+    "dist:mac": "bun ./scripts/build-target.ts darwin",
+    "dist:win": "bun ./scripts/build-target.ts win32",
     "native:build": "bun install --cwd native"
   },
   "main": "./out/main/index.js",

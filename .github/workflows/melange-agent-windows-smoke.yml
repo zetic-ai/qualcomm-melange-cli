@@ -1,0 +1,270 @@
+name: Melange Agent Windows on Arm smoke test
+
+# Builds the Windows on Arm installer the same way a developer does on an
+# Apple Silicon Mac (bun run dist:win), then installs and launches it on a
+# GitHub-hosted Windows 11 Arm64 runner and checks that the app reaches the
+# "loading task finished" state instead of dying in the main process.
+
+on:
+  workflow_dispatch:
+    inputs:
+      artifact_run_id:
+        description: "Reuse the installer artifact from this workflow run id instead of building"
+        required: false
+        default: ""
+  push:
+    branches: ["smoke/**"]
+    paths:
+      - "desktop/packages/desktop/**"
+      - ".github/workflows/melange-agent-windows-smoke.yml"
+      - ".github/scripts/windows-smoke-prompt.mjs"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: melange-agent-windows-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Cross-build installer on macOS arm64
+    if: ${{ inputs.artifact_run_id == '' }}
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.1.2
+        continue-on-error: true
+
+      - name: Fall back to Homebrew cosign if the installer download failed
+        run: cosign version || brew install cosign
+
+      - name: Install dependencies
+        working-directory: desktop
+        run: bun install --frozen-lockfile
+
+      - name: Build and package (win32-arm64)
+        working-directory: desktop/packages/desktop
+        env:
+          OPENCODE_CHANNEL: prod
+          # electron-vite bundles the whole OpenCode server; node's default 2 GB heap is not enough on the runner.
+          NODE_OPTIONS: --max-old-space-size=6144
+          # Demo-only, expiring credentials. With both set the installer is the demo build the
+          # client receives (auto sign-in, Claude Opus 5); without them it is a plain build.
+          MELANGE_DEMO_PAT: ${{ secrets.MELANGE_DEMO_PAT }}
+          MELANGE_DEMO_ANTHROPIC_KEY: ${{ secrets.MELANGE_DEMO_ANTHROPIC_KEY }}
+        run: |
+          if [ -n "$MELANGE_DEMO_PAT" ] && [ -n "$MELANGE_DEMO_ANTHROPIC_KEY" ]; then
+            key="$RUNNER_TEMP/demo-anthropic.key"
+            printf '%s' "$MELANGE_DEMO_ANTHROPIC_KEY" > "$key"
+            MELANGE_DEMO_ANTHROPIC_KEY_FILE="$key" bun run build:demo win32
+            rm -f "$key"
+            echo "demo build: yes"
+          else
+            bun run dist:win
+            echo "demo build: no (secrets missing); the UI prompt step will not get a model reply"
+          fi
+
+      - name: Record what was packaged
+        working-directory: desktop/packages/desktop
+        run: |
+          cat out/main/build-target.json
+          cat resources/melange-qcom/VERIFIED.json
+          ls -la dist/*.exe
+          shasum -a 256 dist/melange-agent-win-arm64.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: melange-agent-win-arm64
+          path: desktop/packages/desktop/dist/melange-agent-win-arm64.exe
+          if-no-files-found: error
+          retention-days: 7
+
+  smoke:
+    name: Install and launch on Windows 11 Arm64
+    needs: build
+    if: ${{ always() && (needs.build.result == 'success' || inputs.artifact_run_id != '') }}
+    runs-on: windows-11-arm
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: melange-agent-win-arm64
+          path: installer
+          run-id: ${{ inputs.artifact_run_id || github.run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Defender state before install
+        shell: pwsh
+        run: |
+          Get-MpComputerStatus | Select-Object AMRunningMode, RealTimeProtectionEnabled, AntivirusEnabled | Format-List
+          Get-MpPreference | Select-Object DisableRealtimeMonitoring, ExclusionPath | Format-List
+
+      - name: Host facts
+        shell: pwsh
+        run: |
+          $os = Get-CimInstance Win32_OperatingSystem
+          "OS: $($os.Caption) $($os.Version) arch=$env:PROCESSOR_ARCHITECTURE"
+          "CPU: $((Get-CimInstance Win32_Processor).Name)"
+          Get-Item installer\*.exe | Format-List Name, Length
+
+      - name: Silent install
+        shell: pwsh
+        run: |
+          $setup = (Get-Item installer\melange-agent-win-arm64.exe).FullName
+          $p = Start-Process -FilePath $setup -ArgumentList '/S' -PassThru -Wait
+          "installer exit code: $($p.ExitCode)"
+          $app = Join-Path $env:LOCALAPPDATA 'Programs\melange-agent\Melange Agent.exe'
+          if (-not (Test-Path $app)) {
+            "Melange Agent.exe not found; contents of Programs:"
+            Get-ChildItem (Join-Path $env:LOCALAPPDATA 'Programs') -Recurse -Depth 1 | Select-Object FullName
+            "--- Defender detections ---"
+            Get-MpThreatDetection | Format-List
+            Get-MpThreat | Format-List
+            "--- Installer payload entries (exe/dll) as seen by 7z on this runner ---"
+            & 7z l $setup | Select-String -Pattern '\.exe|\.dll|\.7z' | Select-Object -First 15
+            exit 1
+          }
+          "installed: $app"
+          Get-ChildItem (Join-Path $env:LOCALAPPDATA 'Programs\melange-agent\resources') | Select-Object Name, Length
+
+      - name: Bundled Qualcomm CLI runs through the launcher
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:LOCALAPPDATA 'Programs\melange-agent\resources\melange-qcom'
+          Get-Content (Join-Path $root 'VERIFIED.json')
+          $launcher = Join-Path $root 'launcher\melange-qcom.cmd'
+          $out = & cmd.exe /c "`"$launcher`" --version" 2>&1
+          "launcher --version -> [$LASTEXITCODE] $out"
+          if ($LASTEXITCODE -ne 0 -or "$out" -notmatch 'melange-qcom version 0\.10\.0') { exit 1 }
+          $exe = Join-Path $root 'bin\melange-qcom.exe'
+          $status = & $exe auth status --json 2>&1
+          "auth status -> [$LASTEXITCODE] $status"
+          # Exit 4 ("not logged in") is the expected answer on a fresh machine; do not let it fail the step.
+          exit 0
+
+      - name: Simulate a PC that already runs upstream OpenCode
+        shell: pwsh
+        run: |
+          # The customer's Snapdragon laptop had OpenCode CLI 2.0.11 installed. Its database at
+          # ~\.local\share\opencode\opencode.db has no `session` table, and ~\.config\opencode
+          # carries a global AGENTS.md. Melange Agent must ignore both.
+          $foreign = Join-Path $env:USERPROFILE '.local\share\opencode'
+          New-Item -ItemType Directory -Force -Path $foreign | Out-Null
+          $db = Join-Path $foreign 'opencode.db'
+          node --experimental-sqlite -e "const { DatabaseSync } = require('node:sqlite'); const d = new DatabaseSync(process.argv[1]); d.exec('CREATE TABLE migration_v2 (id TEXT PRIMARY KEY); CREATE TABLE session_entry (id TEXT PRIMARY KEY)'); d.close()" $db
+          $cfg = Join-Path $env:USERPROFILE '.config\opencode'
+          New-Item -ItemType Directory -Force -Path $cfg | Out-Null
+          Set-Content (Join-Path $cfg 'opencode.json') '{"$schema":"https://opencode.ai/config.json","instructions":["FOREIGN-AGENTS.md"]}'
+          Set-Content (Join-Path $cfg 'AGENTS.md') 'FOREIGN OPENCODE INSTRUCTIONS: Melange Agent must never load this file.'
+          (Get-FileHash $db).Hash | Set-Content foreign-db.sha256
+          "planted foreign OpenCode database at $db and config at $cfg"
+
+      - name: Launch the app and wait for the main process to finish loading
+        shell: pwsh
+        run: |
+          $app = Join-Path $env:LOCALAPPDATA 'Programs\melange-agent\Melange Agent.exe'
+          $proc = Start-Process -FilePath $app -ArgumentList '--remote-debugging-port=9222' -PassThru
+          "started pid $($proc.Id)"
+          # userData is %APPDATA%\ai.zetic.melange-agent (src/main/index.ts) and electron-log
+          # writes <userData>\logs\<run stamp>\main.log (src/main/logging.ts).
+          $logRoot = Join-Path $env:APPDATA 'ai.zetic.melange-agent\logs'
+          $deadline = (Get-Date).AddSeconds(180)
+          $ok = $false
+          $log = $null
+          while ((Get-Date) -lt $deadline) {
+            Start-Sleep -Seconds 5
+            $log = Get-ChildItem -Path $logRoot -Filter main.log -Recurse -ErrorAction SilentlyContinue |
+              Sort-Object LastWriteTime | Select-Object -Last 1
+            if ($log) {
+              $text = Get-Content $log.FullName -Raw
+              if ($text -match 'loading task finished') { $ok = $true; break }
+              if ($text -match 'Uncaught Exception|initialization failed|sidecar exited before') { break }
+            }
+            if ($proc.HasExited) { "process exited early with code $($proc.ExitCode)"; break }
+          }
+          "--- windows owned by Melange Agent processes ---"
+          Get-Process | Where-Object { $_.ProcessName -like 'Melange*' } |
+            Select-Object Id, ProcessName, MainWindowTitle | Format-Table -AutoSize
+          $errorDialog = Get-Process | Where-Object { $_.ProcessName -like 'Melange*' -and $_.MainWindowTitle -eq 'Error' }
+          "--- main.log ---"
+          if ($log) { "at $($log.FullName)"; Get-Content $log.FullName -Tail 80 } else { "no main.log under $logRoot"; Get-ChildItem (Split-Path $logRoot) -Recurse -ErrorAction SilentlyContinue | Select-Object FullName }
+          if ($errorDialog) { "main process error dialog is showing"; exit 1 }
+          if (-not $ok) { "app never logged 'loading task finished'"; exit 1 }
+          "OK: main process finished loading on Windows on Arm"
+
+      - name: Verify the app used its own storage root and left upstream OpenCode alone
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:APPDATA 'ai.zetic.melange-agent\opencode'
+          $ours = Join-Path $root 'data\opencode.db'
+          if (-not (Test-Path $ours)) {
+            "app database not found at $ours"
+            Get-ChildItem $root -Recurse -ErrorAction SilentlyContinue | Select-Object FullName
+            exit 1
+          }
+          "app database: $ours"
+          $db = Join-Path $env:USERPROFILE '.local\share\opencode\opencode.db'
+          if ((Get-FileHash $db).Hash -ne (Get-Content foreign-db.sha256)) { "foreign OpenCode database was modified"; exit 1 }
+          $serverLogs = Get-ChildItem (Join-Path $root 'data\log') -Filter *.log -ErrorAction SilentlyContinue
+          "server logs: $($serverLogs.Count)"
+          $leak = $serverLogs | Select-String -Pattern '\.config\\opencode|\.local\\share\\opencode' | Select-Object -First 3
+          if ($leak) { "server touched the shared OpenCode directories:"; $leak; exit 1 }
+          "OK: isolated storage root in use; upstream OpenCode files untouched"
+
+      - name: Type a prompt into the app and wait for the model's reply
+        shell: pwsh
+        env:
+          EVIDENCE_DIR: ${{ github.workspace }}\artifacts
+          # The model's first answer and tool run are enough here; scaffolding continues past this.
+          SMOKE_REPLY_TIMEOUT_MS: "300000"
+        run: |
+          $work = Join-Path $env:RUNNER_TEMP 'ui-driver'
+          New-Item -ItemType Directory -Force -Path $work | Out-Null
+          Copy-Item "$env:GITHUB_WORKSPACE\.github\scripts\windows-smoke-prompt.mjs" $work
+          Push-Location $work
+          npm init -y | Out-Null
+          npm install --no-audit --no-fund playwright-core@1.59.1 | Out-Null
+          node windows-smoke-prompt.mjs
+          Pop-Location
+
+      - name: Collect evidence and stop the app
+        if: always()
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          $b = [System.Windows.Forms.SystemInformation]::VirtualScreen
+          $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+          $g = [System.Drawing.Graphics]::FromImage($bmp)
+          $g.CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+          $bmp.Save('artifacts\screen.png')
+          $logRoot = Join-Path $env:APPDATA 'ai.zetic.melange-agent\logs'
+          if (Test-Path $logRoot) { Copy-Item $logRoot artifacts\logs -Recurse }
+          Get-Process | Where-Object { $_.ProcessName -like 'Melange*' } | Stop-Process -Force -ErrorAction SilentlyContinue
+          if (Test-Path artifacts\ui-reply.md) { Get-Content artifacts\ui-reply.md }
+          if (Test-Path artifacts\ui-transcript.txt) { "--- transcript ---"; Get-Content artifacts\ui-transcript.txt }
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-arm64-smoke-evidence
+          path: artifacts
+          if-no-files-found: warn

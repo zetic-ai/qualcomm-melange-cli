@@ -16,6 +16,7 @@ interface PartBase {
 
 export interface TextPart extends PartBase {
   type: "text"
+  demoApp?: "translation" | "image" | "appliance"
 }
 
 export interface FileAttachmentPart extends PartBase {
@@ -91,7 +92,7 @@ function isSelectionEqual(a?: FileSelection, b?: FileSelection) {
 function isPartEqual(partA: ContentPart, partB: ContentPart) {
   switch (partA.type) {
     case "text":
-      return partB.type === "text" && partA.content === partB.content
+      return partB.type === "text" && partA.content === partB.content && partA.demoApp === partB.demoApp
     case "file":
       return (
         partB.type === "file" &&
