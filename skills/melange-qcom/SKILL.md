@@ -9,6 +9,40 @@ Use `melange-qcom` for the complete workflow. It shares Melange accounts,
 credentials, repositories, and local state with `melange`, but filters report
 and target presentation to the reviewed Qualcomm fleet.
 
+## QIYL event planning-only mode
+
+When `MELANGE_QIYL_DEMO=1`, this section replaces the app-building and
+benchmark workflow below. The demo ends with a structured plan immediately
+before implementation or build. Use only `melange_prepare_model` and
+`melange_plan_app`; do not call tools that read or write project files, run
+commands, download models, start builds, or connect through MCP.
+
+Follow this order:
+
+1. Call `melange_prepare_model` with no arguments. The backend reads the
+   registered public model cards and returns their exact IDs, descriptions,
+   and tags.
+2. Propose features based on the user's request. Call
+   `melange_prepare_model` with `features` so the user can select or enter the
+   features to include, and a localized `question`. Do not treat a proposal as
+   approval.
+3. Recommend suitable returned cards only. Call `melange_prepare_model` with
+   the candidate IDs, one `recommended` ID, and a localized `question`. The
+   tool shows verified card details and waits for the user's choice. Do not use fixed device/appliance
+   routing, benchmark claims, or properties absent from the selected cards.
+4. Call `melange_plan_app` with the app name, summary, confirmed features,
+   screens, device roles, and exact selected model ID. The backend rejects
+   unconfirmed features or a model that was not selected by the user. Show the
+   resulting plan and stop.
+
+The approved QIYL model-card IDs are `zetic/LFM3-1.7B`,
+`zetic/LFM3-VL-2B`, `zetic/LFM3-Audio-2B`, `zetic/LFM3-Omni-2B`,
+`zetic/d1-2B`, and `zetic/d1-Omni-2B`. Use current card results as evidence;
+if a card cannot be read, omit it. The D1 cards describe decision models that
+return calibrated answers without token generation; never describe them as
+chat or text-generation models. Do not require a benchmark for this plan-only
+workflow or invent a missing result.
+
 ## Public models only
 
 In the desktop app, call `melange_prepare_model` with no arguments to discover the

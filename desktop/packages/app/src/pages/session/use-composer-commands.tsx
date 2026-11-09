@@ -5,6 +5,7 @@ import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { getCursorPosition, setCursorPosition } from "@/components/prompt-input/editor-dom"
 import { useSessionLayout } from "./session-layout"
 import { createSessionOwnership } from "./session-ownership"
+import { qiylDemo, showComposerCommand } from "@/utils/qiyl-demo"
 
 const withCategory = (category: string) => {
   return (option: Omit<CommandOption, "category">): CommandOption => ({
@@ -79,5 +80,5 @@ export const useComposerCommands = (input: { model?: ModelSelection } = {}) => {
       disabled: !local.agent.visible(),
       onSelect: () => local.agent.move(-1),
     }),
-  ])
+  ].filter((option) => showComposerCommand(option.id, qiylDemo, !!model.current())))
 }

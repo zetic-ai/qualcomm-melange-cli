@@ -1,5 +1,41 @@
 export const dict: Record<string, string> = {
   "ui.tool.melangeSnapdragon": "Melange For Snapdragon",
+  "ui.melange.plan.ready": "App plan ready",
+  "ui.melange.plan.stopBeforeBuild": "Review the app plan. This demo ends before the build starts.",
+  "ui.melange.plan.summary": "Summary",
+  "ui.melange.plan.features": "Features",
+  "ui.melange.plan.screens": "Screens",
+  "ui.melange.plan.deviceRoles": "Device roles",
+  "ui.melange.plan.selectedModel": "Selected model",
+  "ui.melange.model.description": "Model description",
+  "ui.melange.model.capabilities": "Capabilities",
+  "ui.melange.model.benchmark": "Verified performance report",
+  "ui.melange.model.viewBenchmarks": "View benchmark measurements",
+  "ui.melange.model.benchmarkUnavailable": "No verified benchmark report is available for this model.",
+  "ui.melange.question.recommendedOption": "{{model}} (Recommended)",
+  "ui.melange.question.modelDescription": "{{summary}} Card tags: {{tags}}.",
+  "ui.melange.model.description.source": "Original model-card description",
+  "ui.melange.model.benchmark.title.throughput": "{{model}} — Qualcomm throughput · {{quantization}}",
+  "ui.melange.model.benchmark.note.available":
+    "Each chart keeps a reported quantization separate; each point is the highest returned tokens/s measurement per Qualcomm SoC and accelerator type.",
+  "ui.melange.model.benchmark.note.noReadyModel":
+    "No ready Melange model version was returned; performance data is unavailable.",
+  "ui.melange.model.benchmark.note.noMeasurements":
+    "No Qualcomm throughput measurements were returned for this model.",
+  "ui.melange.model.benchmark.note.reportUnavailable":
+    "A Melange performance report could not be retrieved; no benchmark claim is available.",
+  "ui.melange.model.summary.lfm3_17b":
+    "Liquid AI LFM3 text model for local agents and specialized applications, with a 256K-token context window and tool calling. Learn more on: https://huggingface.co/LiquidAI/LFM3-1.7B ",
+  "ui.melange.model.summary.lfm3_vl_2b":
+    "Liquid AI LFM3 vision-language model for on-device image and video understanding, with visual reasoning and spatial awareness. Learn more on: https://huggingface.co/LiquidAI/LFM3-VL-2B",
+  "ui.melange.model.summary.lfm3_audio_2b":
+    "Liquid AI LFM3 audio-language model for voice chat, multilingual speech recognition and synthesis, audio understanding, and spoken tool calling. Learn more on: https://huggingface.co/LiquidAI/LFM3-Audio-2B",
+  "ui.melange.model.summary.lfm3_omni_2b":
+    "Liquid AI LFM3 omni-modal model for on-device understanding of text, images, video, and audio, with text and speech responses. Learn more on: https://huggingface.co/LiquidAI/LFM3-Omni-2B",
+  "ui.melange.model.summary.d1_2b":
+    "Liquid AI d1 decision model for text, images, and video, returning calibrated answers in a single forward pass without generating tokens. Learn more on: https://huggingface.co/LiquidAI/d1-2B",
+  "ui.melange.model.summary.d1_omni_2b":
+    "Liquid AI d1 multimodal decision model for text, images, video, and audio, returning calibrated answers without generating tokens. Learn more on: https://huggingface.co/LiquidAI/d1-Omni-2B",
   "ui.sessionReview.title": "Session changes",
   "ui.sessionReview.title.git": "Git changes",
   "ui.sessionReview.title.branch": "Branch changes",
@@ -222,3 +258,5 @@ export const dict: Record<string, string> = {
   "ui.question.singleHint": "Select one answer",
   "ui.question.custom.placeholder": "Type your answer...",
 }
+
+export { dict as uiEnglish }

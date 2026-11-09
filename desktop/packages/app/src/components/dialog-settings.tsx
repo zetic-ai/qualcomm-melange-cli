@@ -1,10 +1,12 @@
-import { Component, createSignal, startTransition } from "solid-js"
+import { Component, createSignal, Show, startTransition } from "solid-js"
 import { Dialog } from "@opencode-ai/ui/dialog"
 import { Tabs } from "@opencode-ai/ui/tabs"
 import { Icon } from "@opencode-ai/ui/icon"
 import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
+import { useProviders } from "@/hooks/use-providers"
+import { hideModelControls, qiylDemo } from "@/utils/qiyl-demo"
 import { SettingsGeneral } from "./settings-general"
 import { SettingsKeybinds } from "./settings-keybinds"
 import { SettingsProviders } from "./settings-providers"
@@ -15,7 +17,10 @@ export const DialogSettings: Component<{ defaultValue?: string }> = (props) => {
   const language = useLanguage()
   const platform = usePlatform()
   const dialog = useDialog()
-  const [tab, setTab] = createSignal(props.defaultValue ?? "general")
+  const providers = useProviders(() => undefined)
+  const hideProviders = () => hideModelControls(qiylDemo, providers.connected().length > 0)
+  const initialTab = props.defaultValue ?? "general"
+  const [tab, setTab] = createSignal(hideProviders() && ["providers", "models"].includes(initialTab) ? "general" : initialTab)
 
   const showProviders = () => {
     void dialog.show(() => <DialogSettings defaultValue="providers" />)
@@ -52,19 +57,21 @@ export const DialogSettings: Component<{ defaultValue?: string }> = (props) => {
                   </div>
                 </div>
 
-                <div class="flex flex-col gap-1.5">
-                  <Tabs.SectionTitle>{language.t("settings.section.server")}</Tabs.SectionTitle>
-                  <div class="flex flex-col gap-1.5 w-full">
-                    <Tabs.Trigger value="providers">
-                      <Icon name="providers" />
-                      {language.t("settings.providers.title")}
-                    </Tabs.Trigger>
-                    <Tabs.Trigger value="models">
-                      <Icon name="models" />
-                      {language.t("settings.models.title")}
-                    </Tabs.Trigger>
+                <Show when={!hideProviders()}>
+                  <div class="flex flex-col gap-1.5">
+                    <Tabs.SectionTitle>{language.t("settings.section.server")}</Tabs.SectionTitle>
+                    <div class="flex flex-col gap-1.5 w-full">
+                      <Tabs.Trigger value="providers">
+                        <Icon name="providers" />
+                        {language.t("settings.providers.title")}
+                      </Tabs.Trigger>
+                      <Tabs.Trigger value="models">
+                        <Icon name="models" />
+                        {language.t("settings.models.title")}
+                      </Tabs.Trigger>
+                    </div>
                   </div>
-                </div>
+                </Show>
               </div>
             </div>
             <div class="flex flex-col gap-1 pl-1 py-1 text-12-medium text-text-weak">

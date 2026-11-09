@@ -1,4 +1,4 @@
-export const dict = {
+export const desktopEnglish = {
   "desktop.menu.checkForUpdates": "Check for Updates...",
   "desktop.menu.installCli": "Install CLI...",
   "desktop.menu.reloadWebview": "Reload Webview",
@@ -28,3 +28,5 @@ export const dict = {
   "desktop.error.dev.rootNotFound":
     "Root element not found. Did you forget to add it to your index.html? Or maybe the id attribute got misspelled?",
 }
+
+export { desktopEnglish as dict }

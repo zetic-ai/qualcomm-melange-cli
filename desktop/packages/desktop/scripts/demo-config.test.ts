@@ -5,6 +5,17 @@ import { join } from "node:path"
 import { prepareDemoConfig } from "./demo-config"
 import { demoEnv } from "../src/main/demo-env"
 
+test("QIYL package activates backend planning restrictions without bundled credentials", () => {
+  const root = mkdtempSync(join(tmpdir(), "melange-qiyl-test-"))
+  try {
+    prepareDemoConfig(root, { VITE_QIYL_DEMO: "1" })
+    expect(demoEnv(root, {})).toEqual({ MELANGE_QIYL_DEMO: "1" })
+    expect(demoEnv(root, { MELANGE_API_KEY: "explicit" })).toEqual({ MELANGE_QIYL_DEMO: "1" })
+    prepareDemoConfig(root, {})
+    expect(demoEnv(root, {})).toEqual({})
+  } finally { rmSync(root, { recursive: true, force: true }) }
+})
+
 test("demo credentials reach CLI and Gradle; normal builds remove them and explicit auth wins", () => {
   const root = mkdtempSync(join(tmpdir(), "melange-demo-test-"))
   try {

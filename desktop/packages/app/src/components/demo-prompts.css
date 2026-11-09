@@ -74,6 +74,9 @@
     font-size: 18px;
   }
 }
+[data-component="demo-prompts"][data-qiyl-demo="true"] {
+  grid-template-columns: 1fr;
+}
 @media (max-width: 680px) {
   [data-component="demo-prompts"] {
     grid-template-columns: 1fr;

@@ -2441,6 +2441,36 @@ noLLMServer.instance(
 )
 
 noLLMServer.instance(
+  "QIYL plan-only mode blocks direct shell and slash-command APIs",
+  () =>
+    Effect.acquireUseRelease(
+      Effect.sync(() => {
+        const previous = process.env.MELANGE_QIYL_DEMO
+        process.env.MELANGE_QIYL_DEMO = "1"
+        return previous
+      }),
+      () =>
+        Effect.gen(function* () {
+          const prompt = yield* SessionPrompt.Service
+          const sessions = yield* Session.Service
+          const session = yield* sessions.create({})
+          const shell = yield* prompt.shell({ sessionID: session.id, agent: "build", command: "echo forbidden" }).pipe(Effect.exit)
+          const command = yield* prompt.command({ sessionID: session.id, command: "init", arguments: "" }).pipe(Effect.exit)
+          expect(Exit.isFailure(shell)).toBe(true)
+          expect(Exit.isFailure(command)).toBe(true)
+          if (Exit.isFailure(shell)) expect(String(Cause.squash(shell.cause))).toContain("Shell commands are disabled")
+          if (Exit.isFailure(command)) expect(String(Cause.squash(command.cause))).toContain("Slash commands are disabled")
+        }),
+      (previous) =>
+        Effect.sync(() => {
+          if (previous === undefined) delete process.env.MELANGE_QIYL_DEMO
+          else process.env.MELANGE_QIYL_DEMO = previous
+        }),
+    ),
+  30_000,
+)
+
+noLLMServer.instance(
   "unknown command throws typed error with available names",
   () =>
     Effect.gen(function* () {

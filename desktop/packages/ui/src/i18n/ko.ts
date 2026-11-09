@@ -1,5 +1,41 @@
 export const dict = {
   "ui.tool.melangeSnapdragon": "Melange For Snapdragon",
+  "ui.melange.plan.ready": "앱 구성 계획이 준비되었습니다",
+  "ui.melange.plan.stopBeforeBuild": "앱 구성 계획을 확인해 주세요. 이번 시연은 앱 빌드가 시작되기 전에 마무리됩니다.",
+  "ui.melange.plan.summary": "요약",
+  "ui.melange.plan.features": "주요 기능",
+  "ui.melange.plan.screens": "화면 구성",
+  "ui.melange.plan.deviceRoles": "기기별 역할",
+  "ui.melange.plan.selectedModel": "선택된 모델",
+  "ui.melange.model.description": "모델 설명",
+  "ui.melange.model.capabilities": "지원 기능",
+  "ui.melange.model.benchmark": "검증된 성능 측정 결과",
+  "ui.melange.model.viewBenchmarks": "벤치마크 결과 보기",
+  "ui.melange.model.benchmarkUnavailable": "이 모델의 검증된 벤치마크 결과가 없습니다.",
+  "ui.melange.question.recommendedOption": "{{model}} (추천)",
+  "ui.melange.question.modelDescription": "{{summary}}\n모델 카드 태그: {{tags}}",
+  "ui.melange.model.description.source": "원본 모델 카드 설명",
+  "ui.melange.model.benchmark.title.throughput": "{{model}} — Qualcomm 처리량 · {{quantization}}",
+  "ui.melange.model.benchmark.note.available":
+    "각 차트는 보고된 양자화 방식을 구분해 표시합니다. 각 Qualcomm SoC와 가속기 유형에서는 초당 토큰 수가 가장 높은 측정값을 보여줍니다.",
+  "ui.melange.model.benchmark.note.noReadyModel":
+    "사용 가능한 상태의 Melange 모델 버전이 없어 성능 측정 결과를 표시할 수 없습니다.",
+  "ui.melange.model.benchmark.note.noMeasurements":
+    "이 모델의 Qualcomm 처리량 측정값이 없습니다.",
+  "ui.melange.model.benchmark.note.reportUnavailable":
+    "Melange 성능 보고서를 가져오지 못해 벤치마크 정보를 확인할 수 없습니다.",
+  "ui.melange.model.summary.lfm3_17b":
+    "로컬 에이전트와 특화 애플리케이션에 사용하는 Liquid AI LFM3 텍스트 모델입니다. 256K 토큰 컨텍스트 창과 도구 호출을 지원합니다.",
+  "ui.melange.model.summary.lfm3_vl_2b":
+    "기기 내 이미지와 동영상 이해를 위한 Liquid AI LFM3 비전 언어 모델입니다. 시각적 추론과 공간 인식을 지원합니다.",
+  "ui.melange.model.summary.lfm3_audio_2b":
+    "음성 대화, 다국어 음성 인식과 합성, 오디오 이해, 음성 기반 도구 호출을 지원하는 Liquid AI LFM3 오디오 언어 모델입니다.",
+  "ui.melange.model.summary.lfm3_omni_2b":
+    "기기 내 텍스트, 이미지, 동영상, 오디오 이해와 텍스트 및 음성 응답을 지원하는 Liquid AI LFM3 멀티모달 모델입니다.",
+  "ui.melange.model.summary.d1_2b":
+    "텍스트, 이미지, 동영상용 Liquid AI d1 의사결정 모델입니다. 토큰을 생성하지 않고 한 번의 순전파로 보정된 답변을 반환합니다.",
+  "ui.melange.model.summary.d1_omni_2b":
+    "텍스트, 이미지, 동영상, 오디오용 Liquid AI d1 멀티모달 의사결정 모델입니다. 토큰을 생성하지 않고 보정된 답변을 반환합니다.",
   "ui.sessionReview.title": "세션 변경 사항",
   "ui.sessionReview.title.lastTurn": "마지막 턴 변경 사항",
   "ui.sessionReview.diffStyle.unified": "통합 보기",
@@ -179,9 +215,9 @@ export const dict = {
   "ui.question.subtitle.answered": "{{count}}개 답변됨",
   "ui.question.answer.none": "(답변 없음)",
   "ui.question.review.notAnswered": "(답변하지 않음)",
-  "ui.question.multiHint": "해당하는 항목 모두 선택",
-  "ui.question.singleHint": "하나의 답변을 선택",
-  "ui.question.custom.placeholder": "답변 입력...",
+  "ui.question.multiHint": "해당하는 항목을 모두 선택하세요.",
+  "ui.question.singleHint": "답변 하나를 선택하세요.",
+  "ui.question.custom.placeholder": "답변을 입력하세요...",
 
   "ui.fileSearch.placeholder": "찾기",
   "ui.fileSearch.previousMatch": "이전 일치 항목",
@@ -220,3 +256,5 @@ export const dict = {
   "ui.sessionTurn.diffs.showLess": "간략히 표시",
   "ui.sessionTurn.diffs.more": "+{{count}}개 더 보기",
 }
+
+export { dict as uiKorean }

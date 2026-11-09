@@ -123,6 +123,10 @@ export function createMelangeAuth(
   command: string,
   baseEnv: NodeJS.ProcessEnv = process.env,
   loadPty = () => import("@lydell/node-pty").catch(() => undefined),
+  openExternal = async (url: string) => {
+    const { shell } = await import("electron")
+    await shell.openExternal(url)
+  },
 ): MelangeAuthPlatform {
   let active: { cancel(): void } | undefined
 
@@ -151,6 +155,8 @@ export function createMelangeAuth(
         let canceled = false
         let fellBack = false
         let settled = false
+        let pending = ""
+        const opened = new Set<string>()
         let child: ReturnType<typeof pty.spawn>
         const finish = (state: MelangeAuthState) => {
           if (settled) return
@@ -159,10 +165,11 @@ export function createMelangeAuth(
           resolve(state)
         }
         try {
-          child = pty.spawn(command, ["auth", "login", "--json"], {
+          child = pty.spawn(command, ["auth", "login", "--no-browser", "--json"], {
             env: commandEnv(baseEnv) as Record<string, string>,
             cwd: process.cwd(),
-            cols: 100,
+            // Avoid wrapping the authorization URL before its query is parsed.
+            cols: 4096,
             rows: 30,
             name: "xterm-256color",
           })
@@ -182,7 +189,30 @@ export function createMelangeAuth(
           },
         }
         child.onData((data) => {
-          output = (output + stripTerminal(data)).slice(-MAX_OUTPUT_LENGTH)
+          const clean = stripTerminal(data)
+          output = (output + clean).slice(-MAX_OUTPUT_LENGTH)
+          pending += clean
+          const lines = pending.split(/\r?\n/)
+          pending = lines.pop() ?? ""
+          for (const line of lines) {
+            for (const match of line.matchAll(/https:\/\/[^\s<>"']+/g)) {
+              if (!URL.canParse(match[0])) continue
+              const url = new URL(match[0])
+              if (
+                url.origin !== new URL(baseEnv.MELANGE_HOST || "https://api.zetic.ai").origin ||
+                url.pathname !== "/oauth/authorize" ||
+                !["client_id", "redirect_uri", "state", "code_challenge"].every((key) => url.searchParams.has(key)) ||
+                opened.has(url.href)
+              ) continue
+              opened.add(url.href)
+              // Windows cmd/start truncates unescaped '&' query parameters.
+              // Electron opens the complete URL without shell interpolation.
+              void openExternal(url.href).catch(() => {
+                child.kill()
+                finish({ status: "unavailable", message: "Browser sign-in is unavailable", retryable: true })
+              })
+            }
+          }
           if (!TOKEN_PROMPT.test(output) || fellBack) return
           fellBack = true
           child.kill()

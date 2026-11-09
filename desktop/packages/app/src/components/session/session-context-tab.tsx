@@ -17,6 +17,7 @@ import { downloadSessionExport, fetchSessionExport, sessionExportFilename } from
 import { useLanguage } from "@/context/language"
 import { useProviders } from "@/hooks/use-providers"
 import { useSDK } from "@/context/sdk"
+import { qiylDemo } from "@/utils/qiyl-demo"
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { getSessionContext } from "./session-context-metrics"
 import { estimateSessionContextBreakdown, type SessionContextBreakdownKey } from "./session-context-breakdown"
@@ -204,8 +205,12 @@ export function SessionContextTab() {
   const stats = [
     { label: "context.stats.session", value: () => info()?.title ?? params.id ?? "—" },
     { label: "context.stats.messages", value: () => counts().all.toLocaleString(language.intl()) },
-    { label: "context.stats.provider", value: providerLabel },
-    { label: "context.stats.model", value: modelLabel },
+    ...(qiylDemo
+      ? []
+      : [
+          { label: "context.stats.provider", value: providerLabel },
+          { label: "context.stats.model", value: modelLabel },
+        ]),
     { label: "context.stats.limit", value: () => formatter().number(ctx()?.limit) },
     { label: "context.stats.totalTokens", value: () => formatter().number(ctx()?.total) },
     { label: "context.stats.usage", value: () => formatter().percent(ctx()?.usage) },
@@ -345,7 +350,7 @@ export function SessionContextTab() {
           </div>
         </Show>
 
-        <Show when={systemPrompt()}>
+        <Show when={!qiylDemo && systemPrompt()}>
           {(prompt) => (
             <div class="flex flex-col gap-2">
               <div class="text-12-regular text-text-weak">{language.t("context.systemPrompt.title")}</div>
@@ -356,27 +361,29 @@ export function SessionContextTab() {
           )}
         </Show>
 
-        <div class="flex flex-col gap-2">
-          <div class="flex items-center justify-between">
-            <div class="text-12-regular text-text-weak">{language.t("context.rawMessages.title")}</div>
-            <Button
-              size="small"
-              variant="ghost"
-              class="gap-1.5 px-2 text-text-weak hover:text-text-base"
-              onClick={exportSession}
-            >
-              <Icon name="download" size="small" />
-              <span>{language.t("context.export.session")}</span>
-            </Button>
+        <Show when={!qiylDemo}>
+          <div class="flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+              <div class="text-12-regular text-text-weak">{language.t("context.rawMessages.title")}</div>
+              <Button
+                size="small"
+                variant="ghost"
+                class="gap-1.5 px-2 text-text-weak hover:text-text-base"
+                onClick={exportSession}
+              >
+                <Icon name="download" size="small" />
+                <span>{language.t("context.export.session")}</span>
+              </Button>
+            </div>
+            <Accordion multiple>
+              <For each={messages()}>
+                {(message) => (
+                  <RawMessage message={message} getParts={getParts} onRendered={restoreScroll} time={formatter().time} />
+                )}
+              </For>
+            </Accordion>
           </div>
-          <Accordion multiple>
-            <For each={messages()}>
-              {(message) => (
-                <RawMessage message={message} getParts={getParts} onRendered={restoreScroll} time={formatter().time} />
-              )}
-            </For>
-          </Accordion>
-        </div>
+        </Show>
       </div>
     </ScrollView>
   )

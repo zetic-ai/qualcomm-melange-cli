@@ -45,6 +45,7 @@ import { CommentsProvider, useComments } from "@/context/comments"
 import { useCommand } from "@/context/command"
 import { DirectoryDataProvider } from "@/pages/directory-layout"
 import { useServerSync } from "@/context/server-sync"
+import { qiylDemo } from "@/utils/qiyl-demo"
 import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
 import { ModelsProvider } from "@/context/models"
@@ -450,6 +451,9 @@ export default function Page() {
   const desktopReviewOpen = createMemo(() => isDesktop() && view().reviewPanel.opened())
   const desktopV2ReviewOpen = createMemo(() => newSessionDesign() && desktopReviewOpen() && !!params.id)
   const terminalOpen = createMemo(() => view().terminal.opened())
+  createEffect(() => {
+    if (qiylDemo && terminalOpen()) view().terminal.close()
+  })
   const desktopTerminalOpen = createMemo(() => isDesktop() && terminalOpen())
   const desktopInlineTerminalOnlyOpen = createMemo(
     () => newSessionDesign() && desktopTerminalOpen() && !desktopV2ReviewOpen(),
@@ -2348,7 +2352,7 @@ export default function Page() {
                   </Suspense>
                 </div>
               </Show>
-              <Show when={desktopV2PanelLayout().stacked}>
+              <Show when={!qiylDemo && desktopV2PanelLayout().stacked}>
                 <div class="relative h-2 shrink-0" onPointerDown={() => size.start()}>
                   <ResizeHandle
                     class="!relative !inset-auto !h-full !w-full !transform-none"
@@ -2365,7 +2369,7 @@ export default function Page() {
                   />
                 </div>
               </Show>
-              <Show when={terminalOpen()}>
+              <Show when={!qiylDemo && terminalOpen()}>
                 <div
                   classList={{
                     "min-h-0 shrink-0": desktopV2PanelLayout().stacked,
@@ -2380,7 +2384,7 @@ export default function Page() {
         </Show>
       </div>
 
-      <Show when={!newSessionDesign()}>
+      <Show when={!newSessionDesign() && !qiylDemo}>
         <TerminalPanel />
       </Show>
     </SessionRouteFrame>

@@ -2,7 +2,6 @@ import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { Tooltip } from "@opencode-ai/ui/tooltip"
 import { Icon as IconV2 } from "@opencode-ai/ui/v2/icon"
 import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
-import { WordmarkV2 } from "@opencode-ai/ui/v2/wordmark-v2"
 import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
 import { Show, createMemo, createSignal, type Accessor } from "solid-js"
 import { createStore } from "solid-js/store"
@@ -23,6 +22,7 @@ import { useProviders } from "@/hooks/use-providers"
 import { useMelangeAuth } from "@/context/melange-auth"
 import { NEW_SESSION_CONTENT_WIDTH } from "@/pages/session/new-session-layout"
 import { Persist, persisted } from "@/utils/persist"
+import { hideModelControls, qiylDemo } from "@/utils/qiyl-demo"
 import type { NewSessionDraftController } from "./new-session-draft-controller"
 import type { NewSessionWorkspaceController } from "./new-session-workspace-controller"
 
@@ -42,8 +42,7 @@ export function NewSessionView(props: {
       >
         <div class="absolute inset-x-0 top-[25.375%] flex justify-center px-6">
           <div class={NEW_SESSION_CONTENT_WIDTH}>
-            <WordmarkV2 class="mx-auto h-32 w-32" />
-            <div class="mt-16 flex flex-col gap-8">
+            <div class="flex flex-col gap-8">
               <PromptInputV2Composer controller={props.input} />
               <Show when={props.project.empty()}>
                 <PromptProjectAddButton controller={props.project} />
@@ -121,6 +120,7 @@ function ProviderTip() {
     () =>
       serverSync().child(sdk().directory)[0].provider_ready &&
       persistedReady() &&
+      !hideModelControls(qiylDemo, providers.connected().length > 0) &&
       providers.paid().length === 0 &&
       Date.now() - persistedState.dismissedAt >= providerTipDismissalDuration,
   )

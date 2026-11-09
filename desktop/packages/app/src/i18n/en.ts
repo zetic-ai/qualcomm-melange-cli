@@ -11,6 +11,11 @@ export const dict = {
   "prompt.demo.appliance.description": "Control appliances with natural language",
   "prompt.demo.appliance.prompt":
     "Build an on-device agent that controls home appliances through natural-language commands.",
+  "prompt.demo.qiyl.appliance.label": "Home appliance management app",
+  "prompt.demo.qiyl.appliance.description": "Manage the appliances in your home more easily",
+  "prompt.demo.qiyl.appliance.prompt": "Create an app that makes it easier to manage the appliances in my home.",
+  "qiyl.prompt.placeholder": "Describe the app you want to create...",
+  "qiyl.setupRequired": "The event setup is not ready. Ask the demo operator to finish setup.",
   ...DESKTOP_NATIVE_ENGLISH,
   "command.category.suggested": "Suggested",
   "command.category.view": "View",
@@ -1159,3 +1164,5 @@ export const dict = {
   "workspace.reset.archived.many": "{{count}} sessions will be archived.",
   "workspace.reset.note": "This will reset the workspace to match the default branch.",
 }
+
+export { dict as appEnglish }

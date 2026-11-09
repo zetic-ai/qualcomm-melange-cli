@@ -73,6 +73,106 @@ test("shows a pending question dock", async ({ page }) => {
   expect((await reply).postDataJSON()).toEqual({ answers: [["Minimal"]] })
 })
 
+test("respects whether a question allows a custom answer", async ({ page }) => {
+  await mockServer(page, {
+    questions: [
+      {
+        id: "question-custom-availability",
+        sessionID,
+        questions: [
+          {
+            header: "Model",
+            question: "Choose a model",
+            options: [{ label: "LFM3-1.7B" }, { label: "D1-2B" }],
+            custom: false,
+          },
+          {
+            header: "Default",
+            question: "Choose a default option",
+            options: [{ label: "Default option" }],
+          },
+          {
+            header: "Custom",
+            question: "Choose an option with custom answers enabled",
+            options: [{ label: "Explicit option" }],
+            custom: true,
+          },
+        ],
+      },
+    ],
+  })
+
+  await page.goto(`/${base64Encode(directory)}/session/${sessionID}`)
+  await expectSessionTitle(page, title)
+
+  const question = page.locator('[data-component="dock-prompt"][data-kind="question"]')
+  await expect(question.getByText("Choose a model")).toBeVisible()
+  await expect(question.locator('[data-custom="true"]')).toHaveCount(0)
+
+  const first = question.getByRole("radio", { name: "LFM3-1.7B" })
+  const last = question.getByRole("radio", { name: "D1-2B" })
+  await first.focus()
+  await page.keyboard.press("End")
+  await expect(last).toBeFocused()
+  await page.keyboard.press("Space")
+  await expect(last).toHaveAttribute("aria-checked", "true")
+
+  await question.getByRole("button", { name: "Next" }).click()
+  await expect(question.getByText("Choose a default option")).toBeVisible()
+  await expect(question.locator('[data-custom="true"]')).toHaveCount(1)
+  await question.locator('[data-custom="true"]').click()
+  const defaultCustomInput = question.locator('[data-slot="question-custom-input"]')
+  await expect(defaultCustomInput).toBeVisible()
+  await defaultCustomInput.fill("Default custom response")
+
+  await question.getByRole("button", { name: "Next" }).click()
+  await expect(question.getByText("Choose an option with custom answers enabled")).toBeVisible()
+  await expect(question.locator('[data-custom="true"]')).toHaveCount(1)
+  await question.locator('[data-custom="true"]').click()
+  const explicitCustomInput = question.locator('[data-slot="question-custom-input"]')
+  await expect(explicitCustomInput).toBeVisible()
+  await explicitCustomInput.fill("Explicit custom response")
+})
+
+test("does not create a custom focus target for an empty non-custom question", async ({ page }) => {
+  await mockServer(page, {
+    questions: [
+      {
+        id: "question-empty-options",
+        sessionID,
+        questions: [
+          {
+            header: "No options",
+            question: "There are no selectable answers",
+            options: [],
+            custom: false,
+          },
+        ],
+      },
+    ],
+  })
+
+  await page.goto(`/${base64Encode(directory)}/session/${sessionID}`)
+  await expectSessionTitle(page, title)
+
+  const question = page.locator('[data-component="dock-prompt"][data-kind="question"]')
+  const options = question.locator('[data-slot="question-options"]')
+  await expect(question.getByText("There are no selectable answers")).toBeVisible()
+  await expect(options.locator('[data-slot="question-option"]')).toHaveCount(0)
+
+  await options.evaluate((element) => {
+    const target = element as HTMLElement
+    target.tabIndex = 0
+    target.focus()
+  })
+  await expect(options).toBeFocused()
+  await page.keyboard.press("End")
+  await expect(options).toBeFocused()
+  await page.keyboard.press("ArrowDown")
+  await expect(options).toBeFocused()
+  await expect(question.locator('[data-custom="true"]')).toHaveCount(0)
+})
+
 test("shows a pending permission dock", async ({ page }) => {
   await mockServer(page, {
     permissions: [

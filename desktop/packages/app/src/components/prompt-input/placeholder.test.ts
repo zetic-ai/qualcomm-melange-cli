@@ -62,4 +62,12 @@ describe("promptDesignPlaceholder", () => {
   test("preserves the shell placeholder", () => {
     expect(promptDesignPlaceholder("shell", "Enter shell command...", t)).toBe("Enter shell command...")
   })
+
+  test("uses a neutral app request hint for both event composer modes", () => {
+    const demoT = (key: string) => (key === "qiyl.prompt.placeholder" ? "Describe the app you want to create..." : key)
+    expect(promptDesignPlaceholder("normal", "fallback", demoT, true)).toBe("Describe the app you want to create...")
+    expect(promptDesignPlaceholder("shell", "Enter shell command...", demoT, true)).toBe(
+      "Describe the app you want to create...",
+    )
+  })
 })

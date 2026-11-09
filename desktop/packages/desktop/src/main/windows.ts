@@ -16,11 +16,13 @@ import { nativeT } from "./native-translations"
 import { createWindowRegistry } from "./window-registry"
 import { safeWindowURL } from "./window-state"
 import { resolveExternalURL, resolveLocalFilePath } from "./external-url"
+import { qiylSetupMode, qiylWindowURL } from "./qiyl-window-mode"
 
 const root = dirname(fileURLToPath(import.meta.url))
 const rendererRoot = join(root, "../renderer")
 const rendererProtocol = "oc"
 const rendererHost = "renderer"
+let qiylSetup = qiylSetupMode(process.argv) ?? false
 const clipboardWritePermission = "clipboard-sanitized-write"
 const notificationPermission = "notifications"
 const rendererPermissions = new Set([clipboardWritePermission, notificationPermission])
@@ -335,11 +337,18 @@ function loadWindow(win: BrowserWindow, html: string) {
   const devUrl = process.env.ELECTRON_RENDERER_URL
   if (devUrl) {
     const url = new URL(html, devUrl)
-    void win.loadURL(url.toString())
+    void win.loadURL(qiylWindowURL(url.toString(), qiylSetup))
     return
   }
 
-  void win.loadURL(`${rendererProtocol}://${rendererHost}/${html}`)
+  void win.loadURL(qiylWindowURL(`${rendererProtocol}://${rendererHost}/${html}`, qiylSetup))
+}
+
+export function showQiylWindowMode(win: BrowserWindow, setup: boolean) {
+  qiylSetup = setup
+  const current = win.webContents.getURL()
+  if (!current || current === "about:blank") return loadWindow(win, "index.html")
+  void win.loadURL(qiylWindowURL(current, setup))
 }
 
 function wireWindowRecovery(win: BrowserWindow, name: string) {

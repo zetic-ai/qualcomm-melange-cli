@@ -5,6 +5,7 @@ import {
   AppBaseProviders,
   AppInterface,
   MelangeSignIn,
+  normalizeLocale,
   type Platform,
   PlatformProvider,
   createDraftStore,
@@ -21,7 +22,7 @@ import { createMemoryHistory, MemoryRouter, type BaseRouterProps } from "@solidj
 import { createEffect, createMemo, createResource, createSignal, onCleanup, Show, type JSX } from "solid-js"
 import { render } from "solid-js/web"
 import pkg from "../../package.json"
-import { t } from "./i18n"
+import { setLocale, t } from "./i18n"
 import { initializationData } from "./initialization"
 import { DesktopFirstLaunchOnboarding } from "./onboarding"
 import { resetZoom, setPinchZoomEnabled, webviewZoom, zoomIn, zoomOut } from "./webview-zoom"
@@ -442,8 +443,10 @@ function DesktopRoot(props: { windowState: DesktopWindowState }) {
   return (
     <PlatformProvider value={platform}>
       <AppBaseProviders
-        locale="en"
-        onNativeTranslations={(bundle) => void window.api.setNativeTranslations(bundle).catch(() => undefined)}
+        onNativeTranslations={(bundle) => {
+          setLocale(normalizeLocale(bundle.locale))
+          void window.api.setNativeTranslations(bundle).catch(() => undefined)
+        }}
       >
         <MelangeFirstLaunchGate>
           <App />

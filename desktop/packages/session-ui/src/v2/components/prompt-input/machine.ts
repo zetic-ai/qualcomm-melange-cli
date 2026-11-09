@@ -15,7 +15,7 @@ export type PromptInputV2InteractionState = {
 }
 
 export type PromptInputV2InteractionEvent =
-  | { type: "input.changed"; value: string; persist?: boolean }
+  | { type: "input.changed"; value: string; persist?: boolean; shellEnabled?: boolean }
   | { type: "commands.open" }
   | { type: "context.open" }
   | { type: "popover.query"; value: string }
@@ -61,7 +61,8 @@ export function transitionPromptInputV2(
   event: PromptInputV2InteractionEvent,
   persisted: PromptInputV2PersistedState,
 ): PromptInputV2Transition {
-  if (event.type === "input.changed") return inputChanged(state, event.value, event.persist !== false, persisted.cursor)
+  if (event.type === "input.changed")
+    return inputChanged(state, event.value, event.persist !== false, persisted.cursor, event.shellEnabled !== false)
   if (event.type === "commands.open") return openCommands(state, persisted)
   if (event.type === "context.open") return openContext(state, persisted)
   if (event.type === "popover.query") return queryChanged(state, event.value)
@@ -86,9 +87,10 @@ function inputChanged(
   value: string,
   persist: boolean,
   cursor: number | undefined,
+  shellEnabled: boolean,
 ): PromptInputV2Transition {
   const setText: PromptInputV2InteractionCommand[] = persist ? [{ type: "draft.setText", value }] : []
-  if (state.mode === "normal" && value === "!") {
+  if (shellEnabled && state.mode === "normal" && value === "!") {
     return changed({ ...state, mode: "shell", popover: { type: "closed" }, focus: "editor" }, [
       { type: "draft.setText", value: "" },
     ])

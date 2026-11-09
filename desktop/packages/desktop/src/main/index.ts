@@ -42,7 +42,9 @@ import {
   setBackgroundColor,
   setDockIcon,
   restoreMainWindows,
+  showQiylWindowMode,
 } from "./windows"
+import { qiylSetupMode } from "./qiyl-window-mode"
 import { createWslServersController } from "./wsl/servers"
 import { registerWslIpcHandlers } from "./wsl/ipc"
 import { spawnWslSidecar } from "./wsl/sidecar"
@@ -204,6 +206,8 @@ const main = Effect.gen(function* () {
     }
     const win = getLastFocusedWindow()
     if (win) {
+      const setup = qiylSetupMode(argv)
+      if (setup !== undefined) showQiylWindowMode(win, setup)
       win.show()
       win.focus()
     }
