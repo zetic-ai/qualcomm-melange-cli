@@ -235,7 +235,13 @@ function UiI18nBridge(props: ParentProps) {
   const language = useLanguage()
   return (
     <I18nProvider
-      value={{ locale: language.intl, layoutLocale: language.layoutLocale, t: language.t, plural: language.plural }}
+      value={{
+        locale: language.intl,
+        layoutLocale: language.layoutLocale,
+        t: language.t,
+        tOptional: language.tOptional,
+        plural: language.plural,
+      }}
     >
       {props.children}
     </I18nProvider>

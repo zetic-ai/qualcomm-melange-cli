@@ -13,6 +13,7 @@ import { makeEventListener } from "@solid-primitives/event-listener"
 import { createResizeObserver } from "@solid-primitives/resize-observer"
 import { useServerSDK } from "@/context/server-sdk"
 import { ScopedKey } from "@/utils/server-scope"
+import { qiylQuestionOptionPresentation } from "./qiyl-question-presentation"
 
 const cache = new Map<string, { tab: number; answers: QuestionAnswer[]; custom: string[]; customOn: boolean[] }>()
 
@@ -550,18 +551,23 @@ export const SessionQuestionDock: Component<{ request: QuestionRequest; onSubmit
           }}
         >
           <For each={options()}>
-            {(opt, i) => (
-              <Option
-                multi={multi()}
-                picked={picked(opt.label)}
-                label={opt.label}
-                description={opt.description}
-                disabled={sending()}
-                ref={(el) => (optsRef[i()] = el)}
-                onFocus={() => setStore("focus", i())}
-                onClick={() => selectOption(i())}
-              />
-            )}
+            {(opt, i) => {
+              const presentation = createMemo(() =>
+                qiylQuestionOptionPresentation(opt.label, opt.description, language.t, language.tOptional),
+              )
+              return (
+                <Option
+                  multi={multi()}
+                  picked={picked(opt.label)}
+                  label={presentation().label}
+                  description={presentation().description}
+                  disabled={sending()}
+                  ref={(el) => (optsRef[i()] = el)}
+                  onFocus={() => setStore("focus", i())}
+                  onClick={() => selectOption(i())}
+                />
+              )
+            }}
           </For>
 
           <Show when={customAllowed()}>

@@ -20,6 +20,8 @@ export type UiI18n = {
   locale: Accessor<string>
   layoutLocale?: Accessor<string>
   t: (key: UiI18nKey, params?: UiI18nParams) => string
+  /** Localized display override for source data; absent translations preserve the original text. */
+  tOptional?: (key: UiI18nKey, params?: UiI18nParams) => string | undefined
   plural: (key: UiI18nPluralKey, count: number, params?: UiI18nParams) => string
 }
 

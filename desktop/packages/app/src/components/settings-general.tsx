@@ -436,6 +436,24 @@ export const SettingsGeneral: Component = () => {
 
       <SettingsList>
         <SettingsRow
+          title={language.t("settings.general.row.language.title")}
+          description={language.t("settings.general.row.language.description")}
+        >
+          <Select
+            data-action="settings-language"
+            options={[...language.locales]}
+            current={language.locale()}
+            value={(locale) => locale}
+            label={language.label}
+            onSelect={(locale) => locale && language.setLocale(locale)}
+            variant="secondary"
+            size="small"
+            triggerVariant="settings"
+            triggerStyle={{ "min-width": "220px" }}
+          />
+        </SettingsRow>
+
+        <SettingsRow
           title={language.t("settings.general.row.colorScheme.title")}
           description={language.t("settings.general.row.colorScheme.description")}
         >

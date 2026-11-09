@@ -126,6 +126,23 @@ const AppearanceSection: Component<{ controller: AppearanceSettingsController }>
       <h3 class="settings-v2-section-title">{language.t("settings.general.section.appearance")}</h3>
       <SettingsListV2>
         <SettingsRowV2
+          title={language.t("settings.general.row.language.title")}
+          description={language.t("settings.general.row.language.description")}
+        >
+          <SelectV2
+            appearance="inline"
+            data-action="settings-language"
+            options={[...language.locales]}
+            current={language.locale()}
+            placement="bottom-end"
+            gutter={6}
+            value={(locale) => locale}
+            label={language.label}
+            onSelect={(locale) => locale && language.setLocale(locale)}
+          />
+        </SettingsRowV2>
+
+        <SettingsRowV2
           title={language.t("settings.general.row.colorScheme.title")}
           description={language.t("settings.general.row.colorScheme.description")}
         >

@@ -1,5 +1,7 @@
 import { createMemo, For, Show } from "solid-js"
+import type { UiI18nKey, UiI18nParams } from "@opencode-ai/ui/context/i18n"
 import { useI18n } from "@opencode-ai/ui/context/i18n"
+import { melangeModelSummaryKey, type MelangeModelSummaryKey } from "@opencode-ai/ui/i18n/melange"
 
 export type MelangeAppPlan = {
   appName: string
@@ -12,6 +14,7 @@ export type MelangeAppPlan = {
 
 export type MelangeBenchmarkChart = {
   title: string
+  displayTitle?: string
   metric: string
   unit: string
   quantization: string
@@ -40,8 +43,27 @@ type MelangeLabelKey =
   | "ui.melange.model.benchmark"
   | "ui.melange.model.viewBenchmarks"
   | "ui.melange.model.benchmarkUnavailable"
+  | "ui.melange.model.description.source"
+  | "ui.melange.model.benchmark.title.throughput"
+  | "ui.melange.model.benchmark.note.available"
+  | "ui.melange.model.benchmark.note.noReadyModel"
+  | "ui.melange.model.benchmark.note.noMeasurements"
+  | "ui.melange.model.benchmark.note.reportUnavailable"
 
-type TranslateMelange = (key: MelangeLabelKey) => string
+type MelangeTranslationKey = MelangeLabelKey | MelangeModelSummaryKey
+type TranslateMelange = (key: MelangeTranslationKey, params?: UiI18nParams) => string
+type TranslateOptionalMelange = (key: UiI18nKey, params?: UiI18nParams) => string | undefined
+
+const benchmarkNotes = {
+  "Each chart keeps a reported quantization separate; each point is the highest returned tokens/s measurement per Qualcomm SoC and accelerator type.":
+    "ui.melange.model.benchmark.note.available",
+  "No ready Melange model version was returned; performance data is unavailable.":
+    "ui.melange.model.benchmark.note.noReadyModel",
+  "No Qualcomm throughput measurements were returned for this model.":
+    "ui.melange.model.benchmark.note.noMeasurements",
+  "A Melange performance report could not be retrieved; no benchmark claim is available.":
+    "ui.melange.model.benchmark.note.reportUnavailable",
+} as const satisfies Record<string, MelangeLabelKey>
 
 function stringList(value: unknown): string[] {
   if (!Array.isArray(value)) return []
@@ -142,17 +164,38 @@ export function readMelangeSelectedModel(metadata: Record<string, unknown>): Mel
   }
 }
 
-export function melangeModelDisplay(model: MelangeModel, t: TranslateMelange) {
+export function melangeModelDisplay(
+  model: MelangeModel,
+  t: TranslateMelange,
+  tOptional?: TranslateOptionalMelange,
+) {
+  const summaryKey = melangeModelSummaryKey(model.id)
+  const localizedDescription = summaryKey ? tOptional?.(summaryKey, { description: model.description }) : undefined
+  const noteKey = model.benchmarkNote ? benchmarkNotes[model.benchmarkNote as keyof typeof benchmarkNotes] : undefined
+  const localizedBenchmarkNote = noteKey ? tOptional?.(noteKey) : undefined
+  const benchmarkNoteDisplay =
+    localizedBenchmarkNote ??
+    (model.benchmarkStatus === "unavailable"
+      ? model.benchmarkNote || t("ui.melange.model.benchmarkUnavailable")
+      : model.benchmarkNote)
   return {
     descriptionLabel: t("ui.melange.model.description"),
+    description: localizedDescription ?? model.description,
+    sourceDescriptionLabel: localizedDescription ? t("ui.melange.model.description.source") : undefined,
+    sourceDescription: localizedDescription ? model.description : undefined,
     capabilitiesLabel: t("ui.melange.model.capabilities"),
     benchmarkLabel: t("ui.melange.model.benchmark"),
     viewBenchmarksLabel: t("ui.melange.model.viewBenchmarks"),
-    benchmarkNote:
-      model.benchmarkStatus === "unavailable"
-        ? model.benchmarkNote || t("ui.melange.model.benchmarkUnavailable")
-        : model.benchmarkNote,
-    benchmarkCharts: model.benchmarkCharts,
+    benchmarkNote: benchmarkNoteDisplay,
+    localizedBenchmarkNote,
+    benchmarkCharts: model.benchmarkCharts.map((chart) => ({
+      ...chart,
+      displayTitle:
+        tOptional?.("ui.melange.model.benchmark.title.throughput", {
+          model: model.name,
+          quantization: chart.quantization,
+        }) ?? undefined,
+    })),
   }
 }
 
@@ -169,7 +212,7 @@ export function melangeAppPlanDisplay(plan: MelangeAppPlan, t: TranslateMelange)
 
 export function MelangeModelDetails(props: { model: MelangeModel; includeName?: boolean; benchmarkGraphs?: boolean }) {
   const i18n = useI18n()
-  const display = createMemo(() => melangeModelDisplay(props.model, i18n.t))
+  const display = createMemo(() => melangeModelDisplay(props.model, i18n.t, i18n.tOptional))
   const max = (points: MelangeBenchmarkChart["points"]) => Math.max(1, ...points.map((point) => point.value))
   return (
     <div data-component="melange-model-details" class="flex flex-col gap-3">
@@ -182,7 +225,13 @@ export function MelangeModelDetails(props: { model: MelangeModel; includeName?: 
       <Show when={props.model.description}>
         <section>
           <h3 class="text-12-medium text-text-weak">{display().descriptionLabel}</h3>
-          <p class="mt-1 whitespace-pre-wrap">{props.model.description}</p>
+          <p class="mt-1 whitespace-pre-wrap">{display().description}</p>
+          <Show when={display().sourceDescription}>
+            <details data-component="melange-model-source" class="mt-2 text-12-regular text-text-weak">
+              <summary class="cursor-pointer">{display().sourceDescriptionLabel}</summary>
+              <p class="mt-1 whitespace-pre-wrap">{display().sourceDescription}</p>
+            </details>
+          </Show>
         </section>
       </Show>
       <Show when={props.model.capabilities.length > 0}>
@@ -193,7 +242,12 @@ export function MelangeModelDetails(props: { model: MelangeModel; includeName?: 
           </ul>
         </section>
       </Show>
-      <Show when={props.model.benchmarkStatus === "unavailable"}>
+      <Show
+        when={
+          props.model.benchmarkStatus === "unavailable" ||
+          (props.model.benchmarkStatus === "available" && props.model.benchmarkCharts.length === 0)
+        }
+      >
         <p data-slot="melange-benchmark-unavailable" class="text-text-weak">
           {display().benchmarkNote}
         </p>
@@ -204,10 +258,15 @@ export function MelangeModelDetails(props: { model: MelangeModel; includeName?: 
             {display().viewBenchmarksLabel} ({display().benchmarkCharts.length})
           </summary>
           <div class="pt-2">
+            <Show when={display().benchmarkNote}>
+              <p data-slot="melange-benchmark-note" class="mb-2 text-12-regular text-text-weak">
+                {display().benchmarkNote}
+              </p>
+            </Show>
             <For each={display().benchmarkCharts}>
               {(chart) => (
                 <figure data-slot="melange-benchmark-chart" class="mt-2 rounded-md bg-surface-base p-3">
-                  <figcaption class="text-13-medium">{chart.title}</figcaption>
+                  <figcaption class="text-13-medium">{chart.displayTitle ?? chart.title}</figcaption>
                   <Show when={chart.quantization}>
                     <div class="mt-1 text-12-regular text-text-weak">{chart.quantization}</div>
                   </Show>
@@ -232,9 +291,6 @@ export function MelangeModelDetails(props: { model: MelangeModel; includeName?: 
             </For>
           </div>
         </details>
-      </Show>
-      <Show when={props.model.benchmarkStatus === "available" && props.model.benchmarkCharts.length === 0 && props.model.benchmarkNote}>
-        <p class="text-12-regular text-text-weak">{props.model.benchmarkNote}</p>
       </Show>
     </div>
   )
