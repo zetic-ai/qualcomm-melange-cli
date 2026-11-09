@@ -118,6 +118,35 @@ describe("tool.registry", () => {
     }),
   )
 
+  withBrokenPlugin.instance(
+    "QIYL mode exposes only planning tools even when plugins provide tools",
+    () =>
+      Effect.acquireUseRelease(
+        Effect.sync(() => {
+          const previous = process.env.MELANGE_QIYL_DEMO
+          process.env.MELANGE_QIYL_DEMO = "1"
+          return previous
+        }),
+        () =>
+          Effect.gen(function* () {
+            const registry = yield* ToolRegistry.Service
+            const agents = yield* Agent.Service
+            const tools = yield* registry.tools({
+              modelID: ModelV2.ID.make("claude-opus-5"),
+              providerID: ProviderV2.ID.anthropic,
+              agent: yield* agents.defaultInfo(),
+            })
+            expect(tools.map((tool) => tool.id)).toEqual(["melange_prepare_model", "melange_plan_app"])
+          }),
+        (previous) =>
+          Effect.sync(() => {
+            if (previous === undefined) delete process.env.MELANGE_QIYL_DEMO
+            else process.env.MELANGE_QIYL_DEMO = previous
+          }),
+      ),
+    30_000,
+  )
+
   withCodeMode.instance("exposes execute when code mode is enabled", () =>
     Effect.gen(function* () {
       const registry = yield* ToolRegistry.Service

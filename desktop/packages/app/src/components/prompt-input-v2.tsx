@@ -27,6 +27,7 @@ import { useSDK } from "@/context/sdk"
 import { useSync } from "@/context/sync"
 import { createSessionTabs } from "@/pages/session/helpers"
 import { showToast } from "@/utils/toast"
+import { demoTemplateMetadata, hideModelControls, qiylDemo, showComposerCommand } from "@/utils/qiyl-demo"
 import { PromptInputV2, type PromptInputV2Suggestion } from "@opencode-ai/session-ui/v2/prompt-input"
 import {
   createPromptInputV2Controller,
@@ -52,35 +53,48 @@ export function PromptInputV2Composer(props: PromptInputV2ComposerProps) {
   const dialog = useDialog()
   const command = useCommand()
   const language = useLanguage()
+  const modelReady = () => !!props.controller.model.selection.current()
+  createEffect(() => {
+    if (qiylDemo && props.controller.state.mode === "shell") props.controller.dispatch({ type: "mode.normal" })
+  })
 
   return (
     <div class="flex flex-col gap-3">
       <DemoPrompts
         hidden={props.controller.demoHidden}
-        disabled={props.controller.demoDisabled}
+        disabled={
+          props.controller.demoDisabled ||
+          (qiylDemo && !props.controller.model.loading && !modelReady())
+        }
         onSend={props.controller.sendDemo}
       />
+      <Show when={qiylDemo && !props.controller.model.loading && !modelReady()}>
+        <div role="status" class="px-3 text-13-regular text-text-weak">{language.t("qiyl.setupRequired")}</div>
+      </Show>
       <PromptInputV2
         controller={props.controller}
         borderUnderlay={props.borderUnderlay}
         class={props.class}
-        variantControlVisible={!props.controller.model.loading}
+        shellEnabled={!qiylDemo}
+        variantControlVisible={!qiylDemo && !props.controller.model.loading}
         attachKeybind={command.keybindParts("file.attach")}
         attachShortcut={command.keybind("file.attach")}
         modelControl={
-          <PromptInputV2ModelControl
-            loading={props.controller.model.loading}
-            paid={props.controller.model.paid}
-            title={language.t("command.model.choose")}
-            keybind={command.keybindParts("model.choose")}
-            model={props.controller.model.selection}
-            providerID={props.controller.model.selection.current()?.provider?.id}
-            modelName={props.controller.model.selection.current()?.name ?? language.t("dialog.model.select.title")}
-            onClose={props.controller.restoreFocus}
-            onUnpaidClick={() =>
-              dialog.show(() => <DialogSelectModelUnpaidV2 model={props.controller.model.selection} />)
-            }
-          />
+          <Show when={!hideModelControls(qiylDemo, !!props.controller.model.selection.current())}>
+            <PromptInputV2ModelControl
+              loading={props.controller.model.loading}
+              paid={props.controller.model.paid}
+              title={language.t("command.model.choose")}
+              keybind={command.keybindParts("model.choose")}
+              model={props.controller.model.selection}
+              providerID={props.controller.model.selection.current()?.provider?.id}
+              modelName={props.controller.model.selection.current()?.name ?? language.t("dialog.model.select.title")}
+              onClose={props.controller.restoreFocus}
+              onUnpaidClick={() =>
+                dialog.show(() => <DialogSelectModelUnpaidV2 model={props.controller.model.selection} />)
+              }
+            />
+          </Show>
         }
       />
     </div>
@@ -147,8 +161,11 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
     }),
   )
   const designPlaceholder = () =>
-    promptDesignPlaceholder(mode(), placeholder(), (key, params) =>
-      language.t(key as Parameters<typeof language.t>[0], params as never),
+    promptDesignPlaceholder(
+      mode(),
+      placeholder(),
+      (key, params) => language.t(key as Parameters<typeof language.t>[0], params as never),
+      qiylDemo,
     )
 
   const historyComments = () => {
@@ -280,7 +297,7 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
   )
   const context = createMemo<PromptInputV2Suggestion[]>(() => [
     ...references(),
-    ...props.controls.agents.available
+    ...(qiylDemo ? [] : props.controls.agents.available)
       .filter((agent) => !agent.hidden && agent.mode !== "primary")
       .map((agent) => ({
         id: `agent:${agent.name}`,
@@ -299,7 +316,7 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
     })),
   ])
   const slashCommands = createMemo(() => [
-    ...sync().data.command.map((item) => ({
+    ...(qiylDemo ? [] : sync().data.command).map((item) => ({
       id: `custom.${item.name}`,
       trigger: item.name,
       title: item.name,
@@ -371,6 +388,7 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
       if (!selected || selected.type === "custom") return
       return () => command.trigger(selected.id, "slash")
     },
+    shellEnabled: !qiylDemo,
     attachments: {
       picker: platform.openAttachmentPickerDialog,
       directory: () => sdk().directory,
@@ -394,7 +412,7 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
     view: {
       placeholder: designPlaceholder,
       get agent() {
-        return props.controls.agents.visible && props.controls.agents.options.length > 0
+        return !qiylDemo && props.controls.agents.visible && props.controls.agents.options.length > 0
           ? {
               options: () => props.controls.agents.options.map((name) => ({ id: name, label: name })),
               current: () => props.controls.agents.current,
@@ -430,7 +448,10 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
   Object.defineProperty(controller, "sendDemo", {
     value: (text: string, demo: DemoApp) => {
       controller.dispatch({ type: "mode.normal" })
-      prompt.set([{ type: "text", content: text, start: 0, end: text.length, demoApp: demo }], text.length)
+      prompt.set(
+        [{ type: "text", content: text, start: 0, end: text.length, demoApp: demoTemplateMetadata(qiylDemo, demo) }],
+        text.length,
+      )
       void submission.handleSubmit(new Event("submit"))
     },
   })
@@ -460,7 +481,7 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
       disabled: controller.state.mode === "normal",
       onSelect: () => controller.dispatch({ type: "mode.normal" }),
     },
-  ])
+  ].filter((option) => showComposerCommand(option.id, qiylDemo, !!props.controls.model.selection.current())))
 
   createEffect(
     on(

@@ -66,6 +66,7 @@ export function createPromptInputV2Controller(input: {
   onContextRemove?: (item: PromptInputV2Comment) => void
   onEditor?: (element: HTMLElement) => void
   onSuggestionSelect?: (item: PromptInputV2Suggestion) => (() => void) | void
+  shellEnabled?: boolean
   view: PromptInputV2ViewConfig
   attachments?: PromptInputV2AttachmentConfig
 }) {
@@ -340,7 +341,7 @@ export function createPromptInputV2Controller(input: {
     restoreFocus,
     onInput(value: string, prompt?: PromptInputV2PersistedState["prompt"], cursor?: number) {
       if (prompt) draft.setPrompt(prompt, cursor)
-      dispatch({ type: "input.changed", value, persist: !prompt })
+      dispatch({ type: "input.changed", value, persist: !prompt, shellEnabled: input.shellEnabled })
     },
     onCursor(cursor: number) {
       draft.setCursor(cursor)
@@ -352,6 +353,7 @@ export function createPromptInputV2Controller(input: {
       dispatch({ type: "context.open" })
     },
     openShell() {
+      if (input.shellEnabled === false) return
       dispatch({ type: "mode.shell" })
     },
     closeShell() {

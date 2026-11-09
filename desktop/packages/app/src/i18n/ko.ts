@@ -9,6 +9,11 @@ export const dict = {
   "prompt.demo.appliance.description": "자연어로 가전제품 제어",
   "prompt.demo.appliance.prompt":
     "Build an on-device agent that controls home appliances through natural-language commands.",
+  "prompt.demo.qiyl.appliance.label": "집안 가전 관리 앱",
+  "prompt.demo.qiyl.appliance.description": "집에 있는 가전제품을 더 편리하게 관리",
+  "prompt.demo.qiyl.appliance.prompt": "집에 있는 가전제품을 보다 편리하게 관리할 수 있는 앱을 만들어줘.",
+  "qiyl.prompt.placeholder": "만들고 싶은 앱을 설명해 주세요...",
+  "qiyl.setupRequired": "시연 환경 설정이 완료되지 않았습니다. 관리자에게 설정을 요청하세요.",
   "command.category.suggested": "추천",
   "command.category.view": "보기",
   "command.category.project": "프로젝트",

@@ -23,6 +23,7 @@ import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { isRecord } from "@/util/record"
 import { RuntimeFlags } from "@/effect/runtime-flags"
+import { QIYL_DEMO_TOOL_IDS } from "@/tool/melange-qiyl"
 
 const MCP_RESOURCE_TOOLS = {
   list: "list_mcp_resources",
@@ -55,6 +56,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   const mcp = yield* MCP.Service
   const truncate = yield* Truncate.Service
   const flags = yield* RuntimeFlags.Service
+  const qiylDemo = process.env.MELANGE_QIYL_DEMO === "1"
 
   const context = (args: Record<string, unknown>, options: ToolExecutionOptions): Tool.Context => ({
     sessionID: input.session.id,
@@ -95,6 +97,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     agent: input.agent,
     permission: input.session.permission,
   })) {
+    if (qiylDemo && !QIYL_DEMO_TOOL_IDS.has(item.id)) continue
     const schema = ProviderTransform.schema(input.model, ToolJsonSchema.fromTool(item))
     tools[item.id] = tool({
       description: item.description,
@@ -103,11 +106,12 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
         return run.promise(
           Effect.gen(function* () {
             const ctx = context(args, options)
-            yield* plugin.trigger(
-              "tool.execute.before",
-              { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID },
-              { args },
-            )
+            if (!qiylDemo)
+              yield* plugin.trigger(
+                "tool.execute.before",
+                { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID },
+                { args },
+              )
             const result = yield* item.execute(args, ctx)
             const output = {
               ...result,
@@ -118,11 +122,12 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
                 messageID: input.processor.message.id,
               })),
             }
-            yield* plugin.trigger(
-              "tool.execute.after",
-              { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID, args },
-              output,
-            )
+            if (!qiylDemo)
+              yield* plugin.trigger(
+                "tool.execute.after",
+                { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID, args },
+                output,
+              )
             if (options.abortSignal?.aborted) {
               yield* input.processor.completeToolCall(options.toolCallId, output)
             }
@@ -132,6 +137,10 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
       },
     })
   }
+
+  // In the event flow the two planning tools above are the complete backend
+  // surface. Return before adding MCP resources, MCP tools, or user plugins.
+  if (qiylDemo) return tools
 
   const hasMcpResourceServer = Object.values(yield* mcp.clients()).some(
     (client) => !!client.getServerCapabilities()?.resources,

@@ -3,6 +3,10 @@ import { join } from "node:path"
 
 export function demoEnv(root: string, env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const result: NodeJS.ProcessEnv = {}
+  const planning = join(root, "qiyl-plan-only")
+  if (existsSync(planning) && readFileSync(planning, "utf8").trim() === "1") {
+    result.MELANGE_QIYL_DEMO = "1"
+  }
   const anthropic = join(root, "demo-anthropic")
   if (existsSync(anthropic)) {
     const key = readFileSync(anthropic, "utf8").trim()

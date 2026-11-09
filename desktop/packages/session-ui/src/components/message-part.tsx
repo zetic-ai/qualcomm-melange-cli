@@ -64,6 +64,8 @@ import { patchFiles } from "./apply-patch-file"
 import { partDefaultOpen } from "./part-default-open"
 import { attached, inline, kind, typeLabel } from "./message-file"
 import { readPartText } from "./message-part-text"
+import { messageIdentity } from "./message-identity"
+import { MelangeModelDetails, MelangePlanDetails, readMelangeAppPlan, readMelangeSelectedModel } from "./melange-plan"
 import { SessionProgressIndicatorV2 } from "../v2/components/session-progress-indicator-v2"
 
 async function writeClipboard(text: string): Promise<boolean> {
@@ -1168,8 +1170,7 @@ export function UserMessageDisplay(props: {
 
   const metaHead = createMemo(() => {
     const agent = props.message.agent
-    const items = [agent ? agent[0]?.toUpperCase() + agent.slice(1) : "", model()]
-    return items.filter((x) => !!x).join("\u00A0\u00B7\u00A0")
+    return messageIdentity(agent, model(), import.meta.env.VITE_QIYL_DEMO === "1").join("\u00A0\u00B7\u00A0")
   })
 
   const metaTail = stamp
@@ -1633,8 +1634,7 @@ PART_MAPPING["text"] = function TextPartDisplay(props) {
     if (props.message.role !== "assistant") return ""
     const agent = (props.message as AssistantMessage).agent
     const items = [
-      agent ? agent[0]?.toUpperCase() + agent.slice(1) : "",
-      model(),
+      ...messageIdentity(agent, model(), import.meta.env.VITE_QIYL_DEMO === "1"),
       duration(),
       interrupted() ? i18n.t("ui.message.interrupted") : "",
     ]
@@ -2577,6 +2577,19 @@ ToolRegistry.register({
   render(props) {
     const i18n = useI18n()
     const reveal = props.metadata.phase !== "selected"
+    const selectedModel = createMemo(() => readMelangeSelectedModel(props.metadata))
+    const output = createMemo(() => {
+      const visualization = props.metadata.visualization
+      if (typeof visualization === "string") return visualization
+      if (!props.output || props.metadata.phase !== "selected" || !selectedModel()) return props.output
+
+      try {
+        JSON.parse(props.output)
+        return undefined
+      } catch {
+        return props.output
+      }
+    })
     const revealChart = (element: HTMLDivElement) => {
       if (!reveal) return
       const show = () => {
@@ -2604,20 +2617,46 @@ ToolRegistry.register({
       <BasicTool
         {...props}
         icon="brain"
-        trigger={{ title: props.metadata.phase === "selected" ? props.metadata.model : i18n.t("ui.tool.questions") }}
+        trigger={{ title: selectedModel()?.name ?? (props.metadata.model as string | undefined) ?? i18n.t("ui.tool.questions") }}
         defaultOpen
       >
-        <Show when={props.output && props.metadata.phase === "selected"}>
+        <Show when={selectedModel()}>
+          {(model) => (
+            <div class="px-3 pb-3 text-14-regular">
+              <MelangeModelDetails model={model()} />
+            </div>
+          )}
+        </Show>
+        <Show when={output() && props.metadata.phase === "selected"}>
           <div
             ref={revealChart}
             data-component="tool-output"
             style={{ "white-space": "normal", width: "100%", "scroll-margin-top": "72px" }}
           >
-            <Markdown
-              text={typeof props.metadata.visualization === "string" ? props.metadata.visualization : props.output!}
-            />
+            <Markdown text={output()!} />
           </div>
         </Show>
+      </BasicTool>
+    )
+  },
+})
+
+ToolRegistry.register({
+  name: "melange_plan_app",
+  render(props) {
+    const i18n = useI18n()
+    const plan = createMemo(() => readMelangeAppPlan(props.metadata))
+    return (
+      <BasicTool
+        {...props}
+        icon="brain"
+        trigger={{
+          title: plan()?.appName ?? i18n.t("ui.melange.plan.ready"),
+          subtitle: i18n.t("ui.melange.plan.ready"),
+        }}
+        defaultOpen
+      >
+        <Show when={plan()}>{(value) => <MelangePlanDetails plan={value()} />}</Show>
       </BasicTool>
     )
   },

@@ -1,22 +1,36 @@
 import { For, Show } from "solid-js"
 import { useLanguage } from "@/context/language"
+import { qiylDemo } from "@/utils/qiyl-demo"
 import "./demo-prompts.css"
 
 export type DemoApp = "translation" | "image" | "appliance"
+type DemoPromptCopy = "label" | "description" | "prompt"
+type DemoPromptKey = `prompt.demo.${DemoApp}.${DemoPromptCopy}` | `prompt.demo.qiyl.appliance.${DemoPromptCopy}`
+
+export function demoPromptOptions(demo: boolean): readonly DemoApp[] {
+  return demo ? ["appliance"] : ["translation", "image", "appliance"]
+}
+
+export function demoPromptTranslationKey(demo: boolean, option: DemoApp, copy: DemoPromptCopy): DemoPromptKey {
+  if (demo && option === "appliance") return `prompt.demo.qiyl.appliance.${copy}`
+  return `prompt.demo.${option}.${copy}`
+}
 
 export function DemoPrompts(props: { disabled: boolean; hidden?: boolean; onSend: (text: string, demo: DemoApp) => void }) {
   const language = useLanguage()
-  const options = ["translation", "image", "appliance"] as const
+  const options = demoPromptOptions(qiylDemo)
   return (
     <Show when={!props.hidden}>
-      <div data-component="demo-prompts">
+      <div data-component="demo-prompts" data-qiyl-demo={qiylDemo ? "true" : undefined}>
         <For each={options}>
           {(option) => (
             <button
               type="button"
               data-demo={option}
               disabled={props.disabled}
-              onClick={() => props.onSend(language.t(`prompt.demo.${option}.prompt`), option)}
+              onClick={() =>
+                props.onSend(language.t(demoPromptTranslationKey(qiylDemo, option, "prompt")), option)
+              }
             >
               <span data-slot="demo-icon" aria-hidden="true">
                 <svg
@@ -46,8 +60,12 @@ export function DemoPrompts(props: { disabled: boolean; hidden?: boolean; onSend
                 </svg>
               </span>
               <span data-slot="demo-copy">
-                <strong>{language.t(`prompt.demo.${option}.label`)}</strong>
-                <span>{language.t(`prompt.demo.${option}.description`)}</span>
+                <strong>
+                  {language.t(demoPromptTranslationKey(qiylDemo, option, "label"))}
+                </strong>
+                <span>
+                  {language.t(demoPromptTranslationKey(qiylDemo, option, "description"))}
+                </span>
               </span>
               <span data-slot="demo-arrow" aria-hidden="true">
                 ↗

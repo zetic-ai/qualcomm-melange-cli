@@ -91,10 +91,11 @@ export const SessionQuestionDock: Component<{ request: QuestionRequest; onSubmit
 
   const question = createMemo(() => questions()[store.tab])
   const options = createMemo(() => question()?.options ?? [])
+  const customAllowed = createMemo(() => question()?.custom !== false)
   const input = createMemo(() => store.custom[store.tab] ?? "")
   const on = createMemo(() => store.customOn[store.tab] === true)
   const multi = createMemo(() => question()?.multiple === true)
-  const count = createMemo(() => options().length + 1)
+  const count = createMemo(() => options().length + (customAllowed() ? 1 : 0))
 
   const summary = createMemo(() => {
     const n = Math.min(store.tab + 1, total())
@@ -150,25 +151,28 @@ export const SessionQuestionDock: Component<{ request: QuestionRequest; onSubmit
     root.style.setProperty("--question-prompt-max-height", `${max}px`)
   }
 
-  const clamp = (i: number) => Math.max(0, Math.min(count() - 1, i))
+  const clamp = (i: number) => (count() === 0 ? -1 : Math.max(0, Math.min(count() - 1, i)))
 
   const pickFocus = (tab: number = store.tab) => {
     const list = questions()[tab]?.options ?? []
-    if (store.customOn[tab] === true) return list.length
-    return Math.max(
-      0,
-      list.findIndex((item) => store.answers[tab]?.includes(item.label) ?? false),
-    )
+    const allowsCustom = questions()[tab]?.custom !== false
+    if (allowsCustom && store.customOn[tab] === true) return list.length
+    const selected = list.findIndex((item) => store.answers[tab]?.includes(item.label) ?? false)
+    if (selected >= 0) return selected
+    if (list.length === 0 && !allowsCustom) return -1
+    return 0
   }
 
   const focus = (i: number) => {
     const next = clamp(i)
     setStore("focus", next)
-    if (store.editing) return
     if (focusFrame !== undefined) cancelAnimationFrame(focusFrame)
+    focusFrame = undefined
+    if (next < 0) return
+    if (store.editing) return
     focusFrame = requestAnimationFrame(() => {
       focusFrame = undefined
-      const el = next === options().length ? customRef : optsRef[next]
+      const el = customAllowed() && next === options().length ? customRef : optsRef[next]
       el?.focus()
     })
   }
@@ -283,7 +287,7 @@ export const SessionQuestionDock: Component<{ request: QuestionRequest; onSubmit
   }
 
   const customToggle = () => {
-    if (sending()) return
+    if (sending() || !customAllowed()) return
     setStore("focus", options().length)
 
     if (!multi()) {
@@ -308,7 +312,7 @@ export const SessionQuestionDock: Component<{ request: QuestionRequest; onSubmit
   }
 
   const customOpen = () => {
-    if (sending()) return
+    if (sending() || !customAllowed()) return
     setStore("focus", options().length)
     if (!on()) setStore("customOn", store.tab, true)
     setStore("editing", true)
@@ -369,7 +373,7 @@ export const SessionQuestionDock: Component<{ request: QuestionRequest; onSubmit
   const selectOption = (optIndex: number) => {
     if (sending()) return
 
-    if (optIndex === options().length) {
+    if (customAllowed() && optIndex === options().length) {
       customOpen()
       return
     }
@@ -560,78 +564,80 @@ export const SessionQuestionDock: Component<{ request: QuestionRequest; onSubmit
             )}
           </For>
 
-          <Show
-            when={store.editing}
-            fallback={
-              <button
-                type="button"
-                ref={customRef}
+          <Show when={customAllowed()}>
+            <Show
+              when={store.editing}
+              fallback={
+                <button
+                  type="button"
+                  ref={customRef}
+                  data-slot="question-option"
+                  data-custom="true"
+                  data-picked={on()}
+                  role={multi() ? "checkbox" : "radio"}
+                  aria-checked={on()}
+                  disabled={sending()}
+                  onFocus={() => setStore("focus", options().length)}
+                  onClick={customOpen}
+                >
+                  <Mark multi={multi()} picked={on()} onClick={toggleCustomMark} />
+                  <span data-slot="question-option-main">
+                    <span data-slot="option-label">{customLabel()}</span>
+                    <span data-slot="option-description">{input() || customPlaceholder()}</span>
+                  </span>
+                </button>
+              }
+            >
+              <form
                 data-slot="question-option"
                 data-custom="true"
                 data-picked={on()}
                 role={multi() ? "checkbox" : "radio"}
                 aria-checked={on()}
-                disabled={sending()}
-                onFocus={() => setStore("focus", options().length)}
-                onClick={customOpen}
+                onMouseDown={(e) => {
+                  if (sending()) {
+                    e.preventDefault()
+                    return
+                  }
+                  if (e.target instanceof HTMLTextAreaElement) return
+                  const input = e.currentTarget.querySelector('[data-slot="question-custom-input"]')
+                  if (input instanceof HTMLTextAreaElement) input.focus()
+                }}
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  commitCustom()
+                }}
               >
                 <Mark multi={multi()} picked={on()} onClick={toggleCustomMark} />
                 <span data-slot="question-option-main">
                   <span data-slot="option-label">{customLabel()}</span>
-                  <span data-slot="option-description">{input() || customPlaceholder()}</span>
-                </span>
-              </button>
-            }
-          >
-            <form
-              data-slot="question-option"
-              data-custom="true"
-              data-picked={on()}
-              role={multi() ? "checkbox" : "radio"}
-              aria-checked={on()}
-              onMouseDown={(e) => {
-                if (sending()) {
-                  e.preventDefault()
-                  return
-                }
-                if (e.target instanceof HTMLTextAreaElement) return
-                const input = e.currentTarget.querySelector('[data-slot="question-custom-input"]')
-                if (input instanceof HTMLTextAreaElement) input.focus()
-              }}
-              onSubmit={(e) => {
-                e.preventDefault()
-                commitCustom()
-              }}
-            >
-              <Mark multi={multi()} picked={on()} onClick={toggleCustomMark} />
-              <span data-slot="question-option-main">
-                <span data-slot="option-label">{customLabel()}</span>
-                <textarea
-                  ref={focusCustom}
-                  data-slot="question-custom-input"
-                  placeholder={customPlaceholder()}
-                  value={input()}
-                  rows={1}
-                  disabled={sending()}
-                  onKeyDown={(e) => {
-                    if (e.key === "Escape") {
+                  <textarea
+                    ref={focusCustom}
+                    data-slot="question-custom-input"
+                    placeholder={customPlaceholder()}
+                    value={input()}
+                    rows={1}
+                    disabled={sending()}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        e.preventDefault()
+                        setStore("editing", false)
+                        focus(options().length)
+                        return
+                      }
+                      if ((e.metaKey || e.ctrlKey) && !e.altKey) return
+                      if (e.key !== "Enter" || e.shiftKey) return
                       e.preventDefault()
-                      setStore("editing", false)
-                      focus(options().length)
-                      return
-                    }
-                    if ((e.metaKey || e.ctrlKey) && !e.altKey) return
-                    if (e.key !== "Enter" || e.shiftKey) return
-                    e.preventDefault()
-                    commitCustom()
-                  }}
-                  onInput={(e) => {
-                    customUpdate(e.currentTarget.value)
-                    resizeInput(e.currentTarget)
-                  }}
-                />
-              </span>
-            </form>
+                      commitCustom()
+                    }}
+                    onInput={(e) => {
+                      customUpdate(e.currentTarget.value)
+                      resizeInput(e.currentTarget)
+                    }}
+                  />
+                </span>
+              </form>
+            </Show>
           </Show>
         </div>
       </DockPrompt>

@@ -23,6 +23,7 @@ import { useProviders } from "@/hooks/use-providers"
 import { useMelangeAuth } from "@/context/melange-auth"
 import { NEW_SESSION_CONTENT_WIDTH } from "@/pages/session/new-session-layout"
 import { Persist, persisted } from "@/utils/persist"
+import { hideModelControls, qiylDemo } from "@/utils/qiyl-demo"
 import type { NewSessionDraftController } from "./new-session-draft-controller"
 import type { NewSessionWorkspaceController } from "./new-session-workspace-controller"
 
@@ -121,6 +122,7 @@ function ProviderTip() {
     () =>
       serverSync().child(sdk().directory)[0].provider_ready &&
       persistedReady() &&
+      !hideModelControls(qiylDemo, providers.connected().length > 0) &&
       providers.paid().length === 0 &&
       Date.now() - persistedState.dismissedAt >= providerTipDismissalDuration,
   )

@@ -1,4 +1,4 @@
-import { Component, createMemo, createSignal, startTransition } from "solid-js"
+import { Component, createMemo, createSignal, Show, startTransition } from "solid-js"
 import { Dialog } from "@opencode-ai/ui/v2/dialog-v2"
 import { TabsV2 } from "@opencode-ai/ui/v2/tabs-v2"
 import { Icon } from "@opencode-ai/ui/icon"
@@ -14,6 +14,8 @@ import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { useLayout } from "@/context/layout"
 import { useTabs } from "@/context/tabs"
 import { useServerSync } from "@/context/server-sync"
+import { useProviders } from "@/hooks/use-providers"
+import { hideModelControls, qiylDemo } from "@/utils/qiyl-demo"
 
 export const DialogSettings: Component<{
   sessionID?: string
@@ -25,7 +27,10 @@ export const DialogSettings: Component<{
   const layout = useLayout()
   const tabs = useTabs()
   const serverSync = useServerSync()
-  const [tab, setTab] = createSignal(props.defaultValue ?? "general")
+  const providers = useProviders(() => undefined)
+  const hideProviders = () => hideModelControls(qiylDemo, providers.connected().length > 0)
+  const initialTab = props.defaultValue ?? "general"
+  const [tab, setTab] = createSignal(hideProviders() && ["providers", "models"].includes(initialTab) ? "general" : initialTab)
   const directory = createMemo(() => {
     const route = layout.route()
     if (route.type === "dir-new-sesssion") return route.dir
@@ -75,14 +80,16 @@ export const DialogSettings: Component<{
                       <Icon name="server" />
                       {language.t("status.popover.tab.servers")}
                     </TabsV2.Trigger>
-                    <TabsV2.Trigger value="providers">
-                      <Icon name="providers" />
-                      {language.t("settings.providers.title")}
-                    </TabsV2.Trigger>
-                    <TabsV2.Trigger value="models">
-                      <Icon name="models" />
-                      {language.t("settings.models.title")}
-                    </TabsV2.Trigger>
+                    <Show when={!hideProviders()}>
+                      <TabsV2.Trigger value="providers">
+                        <Icon name="providers" />
+                        {language.t("settings.providers.title")}
+                      </TabsV2.Trigger>
+                      <TabsV2.Trigger value="models">
+                        <Icon name="models" />
+                        {language.t("settings.models.title")}
+                      </TabsV2.Trigger>
+                    </Show>
                   </div>
                 </div>
               </div>

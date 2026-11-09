@@ -1349,11 +1349,15 @@ const layer = Layer.effect(
     const shell: (input: ShellInput) => Effect.Effect<SessionV1.WithParts, Session.BusyError> = Effect.fn(
       "SessionPrompt.shell",
     )(function* (input: ShellInput) {
+      if (process.env.MELANGE_QIYL_DEMO === "1")
+        return yield* Effect.die(new Error("Shell commands are disabled in QIYL planning-only mode."))
       const ready = yield* Latch.make()
       return yield* state.startShell(input.sessionID, lastAssistant(input.sessionID), shellImpl(input, ready), ready)
     })
 
     const command = Effect.fn("SessionPrompt.command")(function* (input: CommandInput) {
+      if (process.env.MELANGE_QIYL_DEMO === "1")
+        return yield* Effect.die(new Error("Slash commands are disabled in QIYL planning-only mode."))
       yield* Effect.logInfo("command", {
         "session.id": input.sessionID,
         command: input.command,

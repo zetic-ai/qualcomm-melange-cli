@@ -24,10 +24,11 @@ async function command(body: string) {
   return { file, dir }
 }
 
-function pty(result: { data?: string; exitCode?: number } = {}) {
+function pty(result: { data?: string | string[]; exitCode?: number; args?: string[][] } = {}) {
   return async () =>
     ({
-      spawn() {
+      spawn(_command: string, args: string[]) {
+        result.args?.push(args)
         let onData = (_data: string) => undefined
         let onExit = (_event: { exitCode: number }) => undefined
         return {
@@ -40,7 +41,9 @@ function pty(result: { data?: string; exitCode?: number } = {}) {
           onExit(callback: typeof onExit) {
             onExit = callback
             queueMicrotask(() => {
-              if (result.data) onData(result.data)
+              if (result.data) {
+                for (const chunk of Array.isArray(result.data) ? result.data : [result.data]) onData(chunk)
+              }
               if (result.exitCode !== undefined) onExit({ exitCode: result.exitCode })
             })
           },
@@ -140,6 +143,28 @@ exit 2
       })
     } finally {
       await rm(complete.dir, { recursive: true, force: true })
+    }
+  })
+
+  test("opens the complete OAuth query without Windows shell interpolation", async () => {
+    const fixture = await command(`printf '%s\\n' '${status}'`)
+    const url = "https://api.zetic.ai/oauth/authorize?client_id=desktop&redirect_uri=http%3A%2F%2F127.0.0.1%3A4321%2Fcallback&state=test-state&code_challenge=test-challenge"
+    const opened: string[] = []
+    const args: string[][] = []
+    try {
+      const auth = createMelangeAuth(fixture.file, {}, pty({
+        data: [
+          `Visit ${url.slice(0, 90)}`,
+          `${url.slice(90)}\r\nVisit ${url}\r\nVisit https://untrusted.example/oauth/authorize?client_id=x&redirect_uri=x&state=x&code_challenge=x\r\n`,
+        ],
+        exitCode: 0,
+        args,
+      }), async (value) => { opened.push(value) })
+      expect(await auth.loginBrowser()).toMatchObject({ status: "authenticated" })
+      expect(args).toEqual([["auth", "login", "--no-browser", "--json"]])
+      expect(opened).toEqual([url])
+    } finally {
+      await rm(fixture.dir, { recursive: true, force: true })
     }
   })
 

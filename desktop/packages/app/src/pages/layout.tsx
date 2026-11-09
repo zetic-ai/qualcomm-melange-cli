@@ -49,6 +49,7 @@ import { Worktree as WorktreeState } from "@/utils/worktree"
 import { setSessionHandoff } from "@/pages/session/handoff"
 import { SessionRouteKey, SessionStateKey } from "@/utils/server-scope"
 import { listAllSessions } from "@/utils/session"
+import { hideModelControls, qiylDemo } from "@/utils/qiyl-demo"
 
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { useTheme, type ColorScheme } from "@opencode-ai/ui/theme/context"
@@ -1046,7 +1047,9 @@ export default function LegacyLayout(props: ParentProps) {
       })
     }
 
-    return commands
+    return commands.filter((item) =>
+      item.id !== "provider.connect" || !hideModelControls(qiylDemo, providers.connected().length > 0),
+    )
   })
 
   function connectProvider() {
@@ -2153,7 +2156,10 @@ export default function LegacyLayout(props: ParentProps) {
         <div
           class="shrink-0 px-3 py-3"
           classList={{
-            hidden: store.gettingStartedDismissed || !(providers.all().size > 0 && providers.paid().length === 0),
+            hidden:
+              store.gettingStartedDismissed ||
+              hideModelControls(qiylDemo, providers.connected().length > 0) ||
+              !(providers.all().size > 0 && providers.paid().length === 0),
           }}
         >
           <div class="rounded-xl bg-background-base shadow-xs-border-base" data-component="getting-started">

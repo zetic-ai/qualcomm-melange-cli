@@ -20,6 +20,7 @@ import { Message, Part, UserMessage } from "@opencode-ai/sdk/v2"
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { useSessionArchive } from "@/pages/session/session-archive"
 import { createSessionOwnership } from "./session-ownership"
+import { qiylDemo, showComposerCommand } from "@/utils/qiyl-demo"
 import { useLocal } from "@/context/local"
 
 export type SessionCommandContext = {
@@ -653,5 +654,5 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
     ...messageCmds(),
     ...mcpCmds(),
     ...permissionsCmds(),
-  ])
+  ].filter((option) => showComposerCommand(option.id, qiylDemo, true)))
 }

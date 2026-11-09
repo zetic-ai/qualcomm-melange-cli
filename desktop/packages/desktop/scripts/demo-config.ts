@@ -2,6 +2,12 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 export function prepareDemoConfig(root: string, env: NodeJS.ProcessEnv) {
+  const planning = join(root, "qiyl-plan-only")
+  rmSync(planning, { force: true })
+  if (env.VITE_QIYL_DEMO === "1") {
+    mkdirSync(root, { recursive: true })
+    writeFileSync(planning, "1\n", { mode: 0o600 })
+  }
   rmSync(join(root, "demo-anthropic"), { force: true })
   const key = (env.MELANGE_DEMO_ANTHROPIC_KEY_FILE ? readFileSync(env.MELANGE_DEMO_ANTHROPIC_KEY_FILE, "utf8") : "").trim()
   if (key) {

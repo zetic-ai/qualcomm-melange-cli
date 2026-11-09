@@ -50,6 +50,7 @@ import { useCommand } from "@/context/command"
 import { usePermission } from "@/context/permission"
 import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
+import { demoTemplateMetadata, hideModelControls, qiylDemo, showComposerCommand } from "@/utils/qiyl-demo"
 import { createSessionTabs } from "@/pages/session/helpers"
 import { createTextFragment, getCursorPosition, setCursorPosition, setRangeEdge } from "./prompt-input/editor-dom"
 import { createPromptAttachments } from "./prompt-input/attachments"
@@ -262,6 +263,9 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     () => prompt.capture(),
     Math.floor(Math.random() * EXAMPLES.length),
   )
+  createEffect(() => {
+    if (qiylDemo && store.mode === "shell") setStore("mode", "normal")
+  })
   const buttonsSpring = useSpring(() => (store.mode === "normal" ? 1 : 0), { visualDuration: 0.2, bounce: 0 })
   const motion = (value: number) => ({
     opacity: value,
@@ -321,15 +325,16 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
   const suggest = createMemo(() => !hasUserPrompt())
 
-  const placeholder = createMemo(() =>
-    promptPlaceholder({
+  const placeholder = createMemo(() => {
+    if (qiylDemo) return language.t("qiyl.prompt.placeholder")
+    return promptPlaceholder({
       mode: store.mode,
       commentCount: commentCount(),
       example: suggest() ? (store.mode === "shell" ? "git status" : language.t(EXAMPLES[store.placeholder])) : "",
       suggest: suggest(),
       t: (key, params) => language.t(key as Parameters<typeof language.t>[0], params as never),
-    }),
-  )
+    })
+  })
 
   const historyComments = () => {
     const byID = new Map(comments.all().map((item) => [`${item.file}\n${item.id}`, item] as const))
@@ -468,7 +473,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       disabled: store.mode === "normal",
       onSelect: () => setMode("normal"),
     },
-  ])
+  ].filter((option) => showComposerCommand(option.id, qiylDemo, !!props.controls.model.selection.current())))
 
   const closePopover = () => setStore({ popover: null, slashMenu: false, slashMenuQuery: "" })
 
@@ -581,7 +586,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   )
 
   const agentList = createMemo(() =>
-    props.controls.agents.available
+    (qiylDemo ? [] : props.controls.agents.available)
       .filter((agent) => !agent.hidden && agent.mode !== "primary")
       .map((agent): AtOption => ({ type: "agent", name: agent.name, display: agent.name })),
   )
@@ -704,7 +709,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         type: "builtin" as const,
       }))
 
-    const custom = sync().data.command.map((cmd) => ({
+    const custom = (qiylDemo ? [] : sync().data.command).map((cmd) => ({
       id: `custom.${cmd.name}`,
       trigger: cmd.name,
       title: cmd.name,
@@ -1256,7 +1261,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       }
     }
 
-    if (event.key === "!" && store.mode === "normal") {
+    if (!qiylDemo && event.key === "!" && store.mode === "normal") {
       const cursorPosition = getCursorPosition(editorRef)
       if (cursorPosition === 0) {
         setStore("mode", "shell")
@@ -1441,14 +1446,23 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         disabled={
           !prompt.ready() ||
           working() ||
+          (qiylDemo && !providersLoading() && !props.controls.model.selection.current()) ||
           prompt.current().some((part) => part.type !== "text" || part.content.trim().length > 0)
         }
         onSend={(text, demo) => {
           setStore("mode", "normal")
-          prompt.set([{ type: "text", content: text, start: 0, end: text.length, demoApp: demo }], text.length)
+          prompt.set(
+            [{ type: "text", content: text, start: 0, end: text.length, demoApp: demoTemplateMetadata(qiylDemo, demo) }],
+            text.length,
+          )
           void handleSubmit(new Event("submit"))
         }}
       />
+      <Show when={qiylDemo && !providersLoading() && !props.controls.model.selection.current()}>
+        <div role="status" class="px-3 pb-2 text-13-regular text-text-weak">
+          {language.t("qiyl.setupRequired")}
+        </div>
+      </Show>
       <PromptPopover
         popover={store.popover}
         setSlashPopoverRef={(el) => (slashPopoverRef = el)}
@@ -1660,7 +1674,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                 </Button>
               </div>
               <div class="flex items-center gap-1.5 min-w-0 flex-1 h-7">
-                <Show when={!agentsLoading()}>
+                <Show when={!qiylDemo && !agentsLoading()}>
                   <div
                     data-component="prompt-agent-control"
                     classList={{ "animate-in fade-in duration-300": agentsShouldFadeIn() }}
@@ -1688,7 +1702,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                     </TooltipKeybind>
                   </div>
                 </Show>
-                <Show when={!providersLoading()}>
+                <Show when={!providersLoading() && !hideModelControls(qiylDemo, !!props.controls.model.selection.current())}>
                   <Show when={store.mode !== "shell"}>
                     <div
                       data-component="prompt-model-control"

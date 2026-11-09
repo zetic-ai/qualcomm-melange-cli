@@ -55,6 +55,7 @@ import { MCP } from "@/mcp"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { McpCatalog } from "@/mcp/catalog"
 import { MelangePrepareModelTool } from "./melange-prepare-model"
+import { MelangePlanAppTool, MelangePrepareModelQiylTool, QIYL_DEMO_TOOL_IDS } from "./melange-qiyl"
 
 export function webSearchEnabled(providerID: ProviderV2.ID, flags = { exa: false, parallel: false }) {
   return (
@@ -116,6 +117,8 @@ const layer = Layer.effect(
     const patchtool = yield* ApplyPatchTool
     const skilltool = yield* SkillTool
     const melangePrepareModel = yield* MelangePrepareModelTool
+    const melangePrepareModelQiyl = yield* MelangePrepareModelQiylTool
+    const melangePlanApp = yield* MelangePlanAppTool
     const agent = yield* Agent.Service
     const codeMode = flags.experimentalCodeMode ? yield* Effect.promise(() => import("./code-mode")) : undefined
     const codeModeTool = codeMode ? yield* codeMode.CodeModeTool : undefined
@@ -182,26 +185,28 @@ const layer = Layer.effect(
           }
         }
 
-        const dirs = yield* config.directories()
-        const matches = dirs.flatMap((dir) =>
-          Glob.scanSync("{tool,tools}/*.{js,ts}", { cwd: dir, absolute: true, dot: true, symlink: true }),
-        )
-        if (matches.length) yield* config.waitForDependencies()
-        for (const match of matches) {
-          const namespace = path.basename(match, path.extname(match))
-          // `match` is an absolute filesystem path from `Glob.scanSync(..., { absolute: true })`.
-          // Import it as `file://` so Node on Windows accepts the dynamic import.
-          const mod = yield* Effect.promise(() => import(pathToFileURL(match).href))
-          for (const [id, def] of Object.entries(mod)) {
-            if (!isPluginTool(def)) continue
-            custom.push(fromPlugin(id === "default" ? namespace : `${namespace}_${id}`, def))
+        if (process.env.MELANGE_QIYL_DEMO !== "1") {
+          const dirs = yield* config.directories()
+          const matches = dirs.flatMap((dir) =>
+            Glob.scanSync("{tool,tools}/*.{js,ts}", { cwd: dir, absolute: true, dot: true, symlink: true }),
+          )
+          if (matches.length) yield* config.waitForDependencies()
+          for (const match of matches) {
+            const namespace = path.basename(match, path.extname(match))
+            // `match` is an absolute filesystem path from `Glob.scanSync(..., { absolute: true })`.
+            // Import it as `file://` so Node on Windows accepts the dynamic import.
+            const mod = yield* Effect.promise(() => import(pathToFileURL(match).href))
+            for (const [id, def] of Object.entries(mod)) {
+              if (!isPluginTool(def)) continue
+              custom.push(fromPlugin(id === "default" ? namespace : `${namespace}_${id}`, def))
+            }
           }
-        }
 
-        const plugins = yield* plugin.list()
-        for (const p of plugins) {
-          for (const [id, def] of Object.entries(p.tool ?? {})) {
-            custom.push(fromPlugin(id, def))
+          const plugins = yield* plugin.list()
+          for (const p of plugins) {
+            for (const [id, def] of Object.entries(p.tool ?? {})) {
+              custom.push(fromPlugin(id, def))
+            }
           }
         }
 
@@ -221,7 +226,8 @@ const layer = Layer.effect(
           todo: Tool.init(todo),
           search: Tool.init(websearch),
           skill: Tool.init(skilltool),
-          melange_prepare_model: Tool.init(melangePrepareModel),
+          melange_prepare_model: Tool.init((process.env.MELANGE_QIYL_DEMO === "1" ? melangePrepareModelQiyl : melangePrepareModel) as Tool.Info),
+          melange_plan_app: Tool.init(melangePlanApp as Tool.Info),
           patch: Tool.init(patchtool),
           question: Tool.init(question),
           lsp: Tool.init(lsptool),
@@ -246,6 +252,7 @@ const layer = Layer.effect(
             tool.search,
             tool.skill,
             tool.melange_prepare_model,
+            ...(process.env.MELANGE_QIYL_DEMO === "1" ? [tool.melange_plan_app] : []),
             tool.patch,
             ...(tool.execute ? [tool.execute] : []),
             ...(flags.experimentalLspTool ? [tool.lsp] : []),
@@ -294,6 +301,7 @@ const layer = Layer.effect(
 
     const tools: Interface["tools"] = Effect.fn("ToolRegistry.tools")(function* (input) {
       const filtered = (yield* all()).filter((tool) => {
+        if (process.env.MELANGE_QIYL_DEMO === "1") return QIYL_DEMO_TOOL_IDS.has(tool.id)
         if (tool.id === WebSearchTool.id) {
           return webSearchEnabled(input.providerID, { exa: flags.enableExa, parallel: flags.enableParallel })
         }
@@ -319,7 +327,7 @@ const layer = Layer.effect(
             parameters: tool.parameters,
             jsonSchema: tool.jsonSchema,
           }
-          yield* plugin.trigger("tool.definition", { toolID: tool.id }, output)
+          if (process.env.MELANGE_QIYL_DEMO !== "1") yield* plugin.trigger("tool.definition", { toolID: tool.id }, output)
           const jsonSchema =
             output.parameters === tool.parameters || output.jsonSchema !== tool.jsonSchema
               ? output.jsonSchema

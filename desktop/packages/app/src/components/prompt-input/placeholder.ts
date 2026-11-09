@@ -18,7 +18,9 @@ export function promptDesignPlaceholder(
   mode: PromptPlaceholderInput["mode"],
   placeholder: string,
   t: PromptPlaceholderInput["t"],
+  qiylDemo = false,
 ) {
+  if (qiylDemo) return t("qiyl.prompt.placeholder")
   if (mode === "shell") return placeholder
   return t("ui.promptInput.placeholder.normal", { slash: "/", at: "@" })
 }
