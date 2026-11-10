@@ -56,7 +56,7 @@ function isRecord(value: unknown): value is Json {
   return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
-function isApprovedModel(value: unknown): value is ModelID {
+export function isApprovedModel(value: unknown): value is ModelID {
   return typeof value === "string" && ALLOWED_MODELS.some((id) => id === value)
 }
 
@@ -243,7 +243,7 @@ export const MelangePrepareModelQiylTool = Tool.define<typeof PrepareParameters,
                 {
                   header: "Features",
                   question: params.question.trim(),
-                  options: unique.map((feature) => ({ label: feature, description: feature })),
+                  options: unique.map((feature) => ({ label: feature, description: "" })),
                   multiple: true,
                   custom: true,
                 },
@@ -255,7 +255,12 @@ export const MelangePrepareModelQiylTool = Tool.define<typeof PrepareParameters,
             const confirmationId = randomUUID()
             return {
               title: "App features confirmed",
-              output: JSON.stringify({ phase: "features_confirmed", confirmedFeatures: confirmed }),
+              output: JSON.stringify({
+                phase: "features_confirmed",
+                confirmedFeatures: confirmed,
+                next:
+                  "Features are confirmed. Do not repeat this proposal or ask for feature confirmation again. Using only the verified cards from discovery, recommend suitable LFM3/D1 candidates, then call melange_prepare_model with candidates, recommended, and a localized model-selection question. Wait for the user's model choice.",
+              }),
               metadata: {
                 phase: "features_confirmed",
                 proposedFeatures: unique,
@@ -309,6 +314,7 @@ export const MelangePrepareModelQiylTool = Tool.define<typeof PrepareParameters,
               : []
             if (typeof featureConfirmation.confirmationId !== "string")
               throw new Error("The current feature confirmation is missing its confirmation record. Ask the user again.")
+            const selectionId = randomUUID()
             const measured = performance(chosen.card)
             return {
               title: `Model selected: ${chosen.card.name}`,
@@ -319,7 +325,10 @@ export const MelangePrepareModelQiylTool = Tool.define<typeof PrepareParameters,
                 description: chosen.card.description,
                 capabilities: chosen.card.tags,
                 featureConfirmationId: featureConfirmation.confirmationId,
+                selectionId,
                 performance: { status: measured.status, charts: measured.charts, note: measured.note },
+                next:
+                  "The user has selected this model. Do not ask them to choose again. Call melange_plan_app now with the complete confirmed feature set, the app plan, and this exact selected model ID.",
               }),
               metadata: {
                 phase: "selected",
@@ -333,6 +342,7 @@ export const MelangePrepareModelQiylTool = Tool.define<typeof PrepareParameters,
                 benchmarkNote: measured.note,
                 confirmedFeatures: features,
                 featureConfirmationId: featureConfirmation.confirmationId,
+                selectionId,
               },
             }
           }
@@ -379,6 +389,9 @@ export const PlanParameters = Schema.Struct({
 
 type PlanMetadata = {
   phase: "planned"
+  planId: string
+  featureConfirmationId: string
+  selectionId: string
   appName: string
   summary: string
   features: string[]
@@ -420,7 +433,7 @@ export const MelangePlanAppTool = Tool.define<typeof PlanParameters, PlanMetadat
           const features = [...new Set(params.features.map((feature) => feature.trim()).filter(Boolean))]
           if (features.length === 0 || features.length !== confirmed.length || features.some((feature) => !confirmed.includes(feature)))
             throw new Error("The plan must include every feature the user confirmed, without adding unconfirmed features.")
-          if (typeof selected.modelName !== "string" || typeof selected.description !== "string")
+          if (typeof selected.modelName !== "string" || typeof selected.description !== "string" || typeof selected.selectionId !== "string")
             throw new Error("The selected model card is incomplete. Read the model card again before planning.")
           const benchmarkStatus: "available" | "unavailable" | undefined = selected.benchmarkStatus === "available" || selected.benchmarkStatus === "unavailable"
             ? selected.benchmarkStatus
@@ -436,6 +449,9 @@ export const MelangePlanAppTool = Tool.define<typeof PlanParameters, PlanMetadat
             throw new Error("Screens, devices, and device responsibilities must be non-empty.")
           const plan = {
             phase: "planned" as const,
+            planId: randomUUID(),
+            featureConfirmationId: confirmation.confirmationId,
+            selectionId: selected.selectionId,
             appName: params.appName.trim(),
             summary: params.summary.trim(),
             features,
@@ -455,7 +471,11 @@ export const MelangePlanAppTool = Tool.define<typeof PlanParameters, PlanMetadat
           }
           return {
             title: `App plan ready: ${plan.appName}`,
-            output: JSON.stringify(plan),
+            output: JSON.stringify({
+              ...plan,
+              next:
+                "The app plan is ready. Do not repeat it or ask for confirmation again. Call melange_start_implementation to ask whether to begin the approved Android implementation.",
+            }),
             metadata: plan,
           }
         }).pipe(Effect.orDie),
