@@ -23,7 +23,7 @@ import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { isRecord } from "@/util/record"
 import { RuntimeFlags } from "@/effect/runtime-flags"
-import { QIYL_DEMO_TOOL_IDS } from "@/tool/melange-qiyl"
+import { availableQiylToolIDs } from "@/tool/melange-qiyl-implementation"
 
 const MCP_RESOURCE_TOOLS = {
   list: "list_mcp_resources",
@@ -57,6 +57,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   const truncate = yield* Truncate.Service
   const flags = yield* RuntimeFlags.Service
   const qiylDemo = process.env.MELANGE_QIYL_DEMO === "1"
+  const qiylAvailableTools = qiylDemo ? availableQiylToolIDs(input.messages) : undefined
 
   const context = (args: Record<string, unknown>, options: ToolExecutionOptions): Tool.Context => ({
     sessionID: input.session.id,
@@ -97,7 +98,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     agent: input.agent,
     permission: input.session.permission,
   })) {
-    if (qiylDemo && !QIYL_DEMO_TOOL_IDS.has(item.id)) continue
+    if (qiylAvailableTools && !qiylAvailableTools.has(item.id)) continue
     const schema = ProviderTransform.schema(input.model, ToolJsonSchema.fromTool(item))
     tools[item.id] = tool({
       description: item.description,

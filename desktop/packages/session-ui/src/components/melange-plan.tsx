@@ -12,6 +12,11 @@ export type MelangeAppPlan = {
   selectedModel: MelangeModel
 }
 
+export type MelangeImplementationApproval = {
+  phase: "approved" | "declined" | "pending" | "unavailable"
+  appName?: string
+}
+
 export type MelangeBenchmarkChart = {
   title: string
   displayTitle?: string
@@ -33,6 +38,14 @@ export type MelangeModel = {
 
 type MelangeLabelKey =
   | "ui.melange.plan.stopBeforeBuild"
+  | "ui.melange.implementation.approved"
+  | "ui.melange.implementation.approvedDescription"
+  | "ui.melange.implementation.declined"
+  | "ui.melange.implementation.declinedDescription"
+  | "ui.melange.implementation.pending"
+  | "ui.melange.implementation.pendingDescription"
+  | "ui.melange.implementation.unavailable"
+  | "ui.melange.implementation.unavailableDescription"
   | "ui.melange.plan.summary"
   | "ui.melange.plan.features"
   | "ui.melange.plan.screens"
@@ -145,6 +158,20 @@ export function readMelangeAppPlan(metadata: Record<string, unknown>): MelangeAp
   }
 }
 
+export function readMelangeImplementationApproval(
+  metadata: Record<string, unknown>,
+  status?: string,
+): MelangeImplementationApproval {
+  const phase = metadata.phase === "implementation_approved"
+    ? "approved"
+    : metadata.phase === "implementation_declined"
+      ? "declined"
+      : status === "pending" || status === "running"
+        ? "pending"
+        : "unavailable"
+  return { phase, appName: typeof metadata.appName === "string" ? metadata.appName : undefined }
+}
+
 export function readMelangeSelectedModel(metadata: Record<string, unknown>): MelangeModel | undefined {
   if (metadata.phase !== "selected") return
   const id = typeof metadata.model === "string" ? metadata.model : metadata.modelKey
@@ -207,6 +234,25 @@ export function melangeAppPlanDisplay(plan: MelangeAppPlan, t: TranslateMelange)
     screens: { label: t("ui.melange.plan.screens"), items: plan.screens },
     deviceRoles: { label: t("ui.melange.plan.deviceRoles"), items: plan.deviceRoles },
     selectedModel: { label: t("ui.melange.plan.selectedModel"), model: plan.selectedModel },
+  }
+}
+
+export function melangeImplementationApprovalDisplay(approval: MelangeImplementationApproval, t: TranslateMelange) {
+  const titleKeys = {
+    approved: "ui.melange.implementation.approved",
+    declined: "ui.melange.implementation.declined",
+    pending: "ui.melange.implementation.pending",
+    unavailable: "ui.melange.implementation.unavailable",
+  } as const satisfies Record<MelangeImplementationApproval["phase"], MelangeLabelKey>
+  const descriptionKeys = {
+    approved: "ui.melange.implementation.approvedDescription",
+    declined: "ui.melange.implementation.declinedDescription",
+    pending: "ui.melange.implementation.pendingDescription",
+    unavailable: "ui.melange.implementation.unavailableDescription",
+  } as const satisfies Record<MelangeImplementationApproval["phase"], MelangeLabelKey>
+  return {
+    title: t(titleKeys[approval.phase]),
+    description: t(descriptionKeys[approval.phase]),
   }
 }
 

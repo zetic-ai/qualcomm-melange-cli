@@ -65,7 +65,14 @@ import { partDefaultOpen } from "./part-default-open"
 import { attached, inline, kind, typeLabel } from "./message-file"
 import { readPartText } from "./message-part-text"
 import { messageIdentity } from "./message-identity"
-import { MelangeModelDetails, MelangePlanDetails, readMelangeAppPlan, readMelangeSelectedModel } from "./melange-plan"
+import {
+  MelangeModelDetails,
+  MelangePlanDetails,
+  melangeImplementationApprovalDisplay,
+  readMelangeAppPlan,
+  readMelangeImplementationApproval,
+  readMelangeSelectedModel,
+} from "./melange-plan"
 import { SessionProgressIndicatorV2 } from "../v2/components/session-progress-indicator-v2"
 
 async function writeClipboard(text: string): Promise<boolean> {
@@ -2657,6 +2664,34 @@ ToolRegistry.register({
         defaultOpen
       >
         <Show when={plan()}>{(value) => <MelangePlanDetails plan={value()} />}</Show>
+      </BasicTool>
+    )
+  },
+})
+
+ToolRegistry.register({
+  name: "melange_start_implementation",
+  render(props) {
+    const i18n = useI18n()
+    const approval = createMemo(() => readMelangeImplementationApproval(props.metadata, props.status))
+    const display = createMemo(() => melangeImplementationApprovalDisplay(approval(), i18n.t))
+    return (
+      <BasicTool
+        icon="brain"
+        status={props.status}
+        trigger={{
+          title: display().title,
+          subtitle: approval()?.appName,
+        }}
+        defaultOpen
+      >
+        <div
+          data-component="melange-implementation-approval"
+          data-phase={approval().phase}
+          class="px-3 pb-3 text-14-regular"
+        >
+          {display().description}
+        </div>
       </BasicTool>
     )
   },

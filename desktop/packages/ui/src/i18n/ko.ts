@@ -1,7 +1,17 @@
 export const dict = {
   "ui.tool.melangeSnapdragon": "Melange For Snapdragon",
   "ui.melange.plan.ready": "앱 구성 계획이 준비되었습니다",
-  "ui.melange.plan.stopBeforeBuild": "앱 구성 계획을 확인해 주세요. 이번 시연은 앱 빌드가 시작되기 전에 마무리됩니다.",
+  "ui.melange.plan.stopBeforeBuild": "앱 구성 계획을 확인해 주세요. 승인을 받은 뒤에 앱 구현이 시작됩니다.",
+  "ui.melange.implementation.approved": "앱 구현 시작이 승인되었습니다",
+  "ui.melange.implementation.approvedDescription":
+    "승인한 앱 구성 계획에 따라 구현과 빌드를 진행합니다.",
+  "ui.melange.implementation.declined": "앱 구현을 시작하지 않았습니다",
+  "ui.melange.implementation.declinedDescription": "계획을 수정한 뒤 다시 구현 시작을 승인할 수 있습니다.",
+  "ui.melange.implementation.pending": "앱 구현 확인",
+  "ui.melange.implementation.pendingDescription": "앱 구현 시작 여부를 확인하고 있습니다.",
+  "ui.melange.implementation.unavailable": "구현 시작 승인을 확인하지 못했습니다",
+  "ui.melange.implementation.unavailableDescription":
+    "승인 결과를 확인할 수 없습니다. 앱 구성 계획을 확인하고 구현 시작을 승인해 주세요.",
   "ui.melange.plan.summary": "요약",
   "ui.melange.plan.features": "주요 기능",
   "ui.melange.plan.screens": "화면 구성",

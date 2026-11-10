@@ -39,6 +39,8 @@ const it = testEffect(
         questionCalls++
         const question = input.questions[0]!
         const options = question.options
+        if (question.header === "Features")
+          expect(options.every((option) => option.description.trim() !== option.label.trim())).toBe(true)
         // Confirm the first proposal; for the model chooser, pick D1 to ensure the
         // tool records the user's choice rather than silently taking Recommended.
         const selected = question.header === "Features" ? selectedFeatureIndexes : [modelChoiceIndex]
@@ -180,6 +182,8 @@ process.stdout.write(JSON.stringify(result));
         proposedFeatures: ["Room light control", "Appliance status"],
         confirmedFeatures: ["Room light control", "Appliance status"],
       })
+      expect(JSON.parse(features.output).next).toContain("Do not repeat this proposal or ask for feature confirmation again")
+      expect(JSON.parse(features.output).next).toContain("call melange_prepare_model with candidates")
       expect(JSON.parse(readFileSync(envCapture, "utf8"))).toEqual({})
 
       const beforeFeatures = yield* Effect.exit(
@@ -210,6 +214,7 @@ process.stdout.write(JSON.stringify(result));
       })
       expect(selection.metadata.description).toContain("without token generation")
       expect(selection.metadata.benchmarkCharts).toEqual([])
+      expect(JSON.parse(selection.output).next).toContain("Call melange_plan_app now")
 
       modelChoiceIndex = 0
       const lfmSelection = yield* prepareTool.execute(
@@ -259,6 +264,7 @@ process.stdout.write(JSON.stringify(result));
         features: ["Room light control", "Appliance status"],
         selectedModel: { id: "zetic/d1-2B", name: "d1-2B" },
       })
+      expect(JSON.parse(output.output).next).toContain("Call melange_start_implementation")
       expect(output.metadata.selectedModel.benchmarkStatus).toBe("unavailable")
 
       const changedModel = yield* Effect.exit(planTool.execute({ ...args, modelId: approved[0]! }, toolContext(previousResults)))

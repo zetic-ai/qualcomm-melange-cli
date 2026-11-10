@@ -55,7 +55,9 @@ import { MCP } from "@/mcp"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { McpCatalog } from "@/mcp/catalog"
 import { MelangePrepareModelTool } from "./melange-prepare-model"
-import { MelangePlanAppTool, MelangePrepareModelQiylTool, QIYL_DEMO_TOOL_IDS } from "./melange-qiyl"
+import { MelangePlanAppTool, MelangePrepareModelQiylTool } from "./melange-qiyl"
+import { MelangeStartImplementationTool } from "./melange-qiyl-implementation"
+import { QIYL_TOOL_IDS } from "./melange-qiyl-policy"
 
 export function webSearchEnabled(providerID: ProviderV2.ID, flags = { exa: false, parallel: false }) {
   return (
@@ -119,6 +121,7 @@ const layer = Layer.effect(
     const melangePrepareModel = yield* MelangePrepareModelTool
     const melangePrepareModelQiyl = yield* MelangePrepareModelQiylTool
     const melangePlanApp = yield* MelangePlanAppTool
+    const melangeStartImplementation = yield* MelangeStartImplementationTool
     const agent = yield* Agent.Service
     const codeMode = flags.experimentalCodeMode ? yield* Effect.promise(() => import("./code-mode")) : undefined
     const codeModeTool = codeMode ? yield* codeMode.CodeModeTool : undefined
@@ -228,6 +231,7 @@ const layer = Layer.effect(
           skill: Tool.init(skilltool),
           melange_prepare_model: Tool.init((process.env.MELANGE_QIYL_DEMO === "1" ? melangePrepareModelQiyl : melangePrepareModel) as Tool.Info),
           melange_plan_app: Tool.init(melangePlanApp as Tool.Info),
+          melange_start_implementation: Tool.init(melangeStartImplementation as Tool.Info),
           patch: Tool.init(patchtool),
           question: Tool.init(question),
           lsp: Tool.init(lsptool),
@@ -252,7 +256,9 @@ const layer = Layer.effect(
             tool.search,
             tool.skill,
             tool.melange_prepare_model,
-            ...(process.env.MELANGE_QIYL_DEMO === "1" ? [tool.melange_plan_app] : []),
+            ...(process.env.MELANGE_QIYL_DEMO === "1"
+              ? [tool.melange_plan_app, tool.melange_start_implementation]
+              : []),
             tool.patch,
             ...(tool.execute ? [tool.execute] : []),
             ...(flags.experimentalLspTool ? [tool.lsp] : []),
@@ -301,7 +307,7 @@ const layer = Layer.effect(
 
     const tools: Interface["tools"] = Effect.fn("ToolRegistry.tools")(function* (input) {
       const filtered = (yield* all()).filter((tool) => {
-        if (process.env.MELANGE_QIYL_DEMO === "1") return QIYL_DEMO_TOOL_IDS.has(tool.id)
+        if (process.env.MELANGE_QIYL_DEMO === "1") return QIYL_TOOL_IDS.has(tool.id)
         if (tool.id === WebSearchTool.id) {
           return webSearchEnabled(input.providerID, { exa: flags.enableExa, parallel: flags.enableParallel })
         }

@@ -1,7 +1,17 @@
 export const dict: Record<string, string> = {
   "ui.tool.melangeSnapdragon": "Melange For Snapdragon",
   "ui.melange.plan.ready": "App plan ready",
-  "ui.melange.plan.stopBeforeBuild": "Review the app plan. This demo ends before the build starts.",
+  "ui.melange.plan.stopBeforeBuild": "Review the app plan. Implementation starts only after you approve it.",
+  "ui.melange.implementation.approved": "App implementation approved",
+  "ui.melange.implementation.approvedDescription":
+    "Implementation and building follow the approved app plan.",
+  "ui.melange.implementation.declined": "App implementation not started",
+  "ui.melange.implementation.declinedDescription": "You can revise the app plan before approving implementation.",
+  "ui.melange.implementation.pending": "Confirm app implementation",
+  "ui.melange.implementation.pendingDescription": "Waiting for confirmation to start app implementation.",
+  "ui.melange.implementation.unavailable": "Implementation approval not confirmed",
+  "ui.melange.implementation.unavailableDescription":
+    "The approval result is unavailable. Review the app plan and approve implementation before it starts.",
   "ui.melange.plan.summary": "Summary",
   "ui.melange.plan.features": "Features",
   "ui.melange.plan.screens": "Screens",

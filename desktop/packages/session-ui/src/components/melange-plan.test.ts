@@ -1,12 +1,50 @@
 import { describe, expect, test } from "bun:test"
 import {
   melangeAppPlanDisplay,
+  melangeImplementationApprovalDisplay,
   melangeModelDisplay,
   readMelangeAppPlan,
+  readMelangeImplementationApproval,
   readMelangeSelectedModel,
 } from "./melange-plan"
 
 describe("Melange demo metadata", () => {
+  test("projects only approval state and app name without exposing internal bindings", () => {
+    expect(readMelangeImplementationApproval({
+      phase: "implementation_approved",
+      planId: "internal-plan-id",
+      featureConfirmationId: "internal-confirmation-id",
+      selectionId: "internal-selection-id",
+      model: "zetic/d1-2B",
+      appName: "Home appliance manager",
+    })).toEqual({ phase: "approved", appName: "Home appliance manager" })
+    expect(readMelangeImplementationApproval({ phase: "implementation_declined" })).toEqual({ phase: "declined" })
+    expect(readMelangeImplementationApproval({}, "running")).toEqual({ phase: "pending" })
+    expect(readMelangeImplementationApproval({ phase: "planned" }, "error")).toEqual({ phase: "unavailable" })
+  })
+
+  test("uses phase-accurate approval copy for approval, decline, pending, and failure", () => {
+    const labels = {
+      "ui.melange.implementation.approved": "App implementation approved",
+      "ui.melange.implementation.approvedDescription":
+        "Implementation and building follow the approved app plan.",
+      "ui.melange.implementation.declined": "App implementation not started",
+      "ui.melange.implementation.declinedDescription": "You can revise the app plan before approving implementation.",
+      "ui.melange.implementation.pending": "Confirm app implementation",
+      "ui.melange.implementation.pendingDescription": "Waiting for confirmation to start app implementation.",
+      "ui.melange.implementation.unavailable": "Implementation approval not confirmed",
+      "ui.melange.implementation.unavailableDescription": "The approval result is unavailable.",
+    }
+    const t = (key: string) => labels[key as keyof typeof labels]
+    expect(melangeImplementationApprovalDisplay({ phase: "approved" }, t)).toEqual({
+      title: "App implementation approved",
+      description: "Implementation and building follow the approved app plan.",
+    })
+    expect(melangeImplementationApprovalDisplay({ phase: "declined" }, t).title).toBe("App implementation not started")
+    expect(melangeImplementationApprovalDisplay({ phase: "pending" }, t).title).toBe("Confirm app implementation")
+    expect(melangeImplementationApprovalDisplay({ phase: "unavailable" }, t).title).toBe("Implementation approval not confirmed")
+  })
+
   test("reads the planned app fields used by the review card", () => {
     expect(
       readMelangeAppPlan({
@@ -118,7 +156,7 @@ describe("Melange demo metadata", () => {
       },
     })!
     const labels = {
-      "ui.melange.plan.stopBeforeBuild": "Before build",
+      "ui.melange.plan.stopBeforeBuild": "Implementation starts only after approval",
       "ui.melange.plan.summary": "Summary",
       "ui.melange.plan.features": "Features",
       "ui.melange.plan.screens": "Screens",
@@ -134,7 +172,7 @@ describe("Melange demo metadata", () => {
     const modelDisplay = melangeModelDisplay(plan.selectedModel, (key) => labels[key as keyof typeof labels])
 
     expect(display).toMatchObject({
-      stopBeforeBuild: "Before build",
+      stopBeforeBuild: "Implementation starts only after approval",
       summary: { label: "Summary", text: "Phone control for home devices." },
       features: { label: "Features", items: ["Toggle a light"] },
       screens: { label: "Screens", items: ["Home"] },
@@ -160,7 +198,7 @@ describe("Melange demo metadata", () => {
       benchmarkNote: "No performance data is available for this model.",
     })!
     const labels = {
-      "ui.melange.plan.stopBeforeBuild": "Before build",
+      "ui.melange.plan.stopBeforeBuild": "Implementation starts only after approval",
       "ui.melange.plan.summary": "Summary",
       "ui.melange.plan.features": "Features",
       "ui.melange.plan.screens": "Screens",
