@@ -86,9 +86,9 @@ const it = testEffect(
 describe("session.system", () => {
   test("adds Melange context independently of the selected model harness", () => {
     for (const id of ["claude-sonnet-4", "gemini-2.5-pro", "gpt-6"]) {
-      expect(SystemPrompt.provider({ providerID: "test", api: { id } } as Provider.Model).join("\n")).toContain(
-        "You are Melange Agent. The Qualcomm Melange CLI is available as `melange-qcom`; use it, not `melange`",
-      )
+      const prompt = SystemPrompt.provider({ providerID: "test", api: { id } } as Provider.Model).join("\n")
+      expect(prompt).toContain("You are Melange Agent for Qualcomm on-device AI development.")
+      expect(prompt).toContain("melange-qcom")
     }
   })
 

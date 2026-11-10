@@ -219,7 +219,7 @@ export const MelangePrepareModelQiylTool = Tool.define<typeof PrepareParameters,
     const question = yield* Question.Service
     return {
       description:
-        "QIYL planning flow: discover approved LFM3/D1 model cards; confirm user-selected app features; recommend verified card candidates and wait for the user's model choice. This tool never builds or edits files.",
+        "QIYL planning flow: discover approved LFM3/D1 model cards; confirm user-selected app features; recommend verified card candidates and wait for the user's model choice. Feature proposals and questions are participant-facing: stay within the requested app's domain and omit unrelated demo setups, excluded appliance controls, and internal authentication or build setup. This tool never builds or edits files.",
       parameters: PrepareParameters,
       execute: (params: Schema.Schema.Type<typeof PrepareParameters>, ctx: Tool.Context) =>
         Effect.gen(function* () {
@@ -328,7 +328,7 @@ export const MelangePrepareModelQiylTool = Tool.define<typeof PrepareParameters,
                 selectionId,
                 performance: { status: measured.status, charts: measured.charts, note: measured.note },
                 next:
-                  "The user has selected this model. Do not ask them to choose again. Call melange_plan_app now with the complete confirmed feature set, the app plan, and this exact selected model ID.",
+                  "The user has selected this model. Do not ask them to choose again. Call melange_plan_app now with the complete confirmed feature set, the participant-facing app plan, and this exact selected model ID. Describe app behavior and runtime devices only; omit unrelated demo exclusions and developer authentication, SDK, or build setup.",
               }),
               metadata: {
                 phase: "selected",
@@ -361,7 +361,7 @@ export const MelangePrepareModelQiylTool = Tool.define<typeof PrepareParameters,
                 description: card.description,
                 capabilities: card.tags,
               })),
-              next: "Use only these verified card descriptions and tags. Propose a concise feature set, then call melange_prepare_model with features to ask the user which to include. Ask no implementation or build questions.",
+              next: "Use only these verified card descriptions and tags. Propose concise end-user features specific to the requested app, then call melange_prepare_model with features to ask the user which to include. Omit unrelated demo setups and developer authentication or build details. Ask no implementation or build questions.",
             }),
             metadata: {
               phase: "discovery",
@@ -412,7 +412,7 @@ export const MelangePlanAppTool = Tool.define<typeof PlanParameters, PlanMetadat
   Effect.gen(function* () {
     return {
       description:
-        "Finalize a structured QIYL app plan only after the user's feature confirmation and Melange model selection. This tool cannot write code or start a build.",
+        "Finalize a participant-facing QIYL app plan only after the user's feature confirmation and Melange model selection. All fields describe the requested app's behavior, screens, and runtime devices. Exclude unrelated demo comparisons, developer workstations, Melange/provider authentication, credentials, SDK integration, Gradle, and APK/build setup. A device role is what a participant can do or see on a device the finished app uses, not where it is developed or built. This tool cannot write code or start a build.",
       parameters: PlanParameters,
       execute: (params: Schema.Schema.Type<typeof PlanParameters>, ctx: Tool.Context) =>
         Effect.gen(function* () {
